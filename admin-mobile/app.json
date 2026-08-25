@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Fresh Store Admin",
+    "slug": "fresh-store-admin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": { "backgroundColor": "#101913" },
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.freshstore.admin" },
+    "android": { "package": "com.freshstore.admin", "permissions": ["NOTIFICATIONS"] },
+    "plugins": [
+      ["expo-notifications", { "icon": "./assets/icon.png", "color": "#1B7A43" }],
+      ["expo-image-picker", { "photosPermission": "Fresh Store Admin uses your photos to add product images." }]
+    ]
+  }
+}

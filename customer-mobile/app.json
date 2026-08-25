@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Fresh Store",
+    "slug": "fresh-store-customer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#F7F8F3"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.freshstore.customer" },
+    "android": {
+      "package": "com.freshstore.customer",
+      "permissions": ["NOTIFICATIONS"]
+    },
+    "plugins": [
+      "react-native-razorpay",
+      ["expo-notifications", { "icon": "./assets/icon.png", "color": "#1B7A43" }]
+    ]
+  }
+}
