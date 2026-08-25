@@ -57,7 +57,7 @@ import devicesRoutes from "./routes/devices.js";
 import { startStaleReservationSweep } from "./jobs/staleReservationSweep.js";
 
 const app = express();
-
+console.log("🔥 FRESH STORE BACKEND VERSION: 2026-08-25-ROOT-TEST");
 // Security headers
 app.use(
   helmet({
