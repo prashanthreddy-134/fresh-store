@@ -84,6 +84,13 @@ app.use("/uploads", express.static("uploads"));
 
 app.get("/health", (req, res) => res.json({ status: "ok", time: new Date().toISOString() }));
 
+app.get("/", (req, res) => {
+  res.json({
+    message: "Fresh Store API is running",
+    status: "ok"
+  });
+});
+
 // Central error handler — never leak stack traces to clients
 app.use((err, req, res, next) => {
   console.error(err);
