@@ -195,6 +195,9 @@ router.delete(
 // Pagination is intentionally handled after stock-priority sorting
 // to avoid pushing low-stock products onto later pages.
 router.get("/products", async (req, res) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+res.set("Pragma", "no-cache");
+res.set("Expires", "0");
   try {
     const {
       q,

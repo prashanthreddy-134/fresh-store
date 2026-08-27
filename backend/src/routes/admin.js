@@ -391,6 +391,12 @@ router.get("/customers", async (req, res) => {
               orders: true,
             },
           },
+
+          storeCash: {
+            select: {
+              balance: true,
+            },
+          },
         },
       }),
 
@@ -415,7 +421,316 @@ router.get("/customers", async (req, res) => {
   }
 });
 
-// Enable / Disable customer
+// ============================================================
+// STORE CASH — ADMIN
+// ============================================================
+
+// Get a customer's Store Cash balance and history
+router.get(
+  "/customers/:id/store-cash",
+  async (req, res) => {
+    try {
+      const customer =
+        await prisma.user.findUnique({
+          where: {
+            id: req.params.id,
+          },
+
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            role: true,
+
+            storeCash: {
+              include: {
+                transactions: {
+                  orderBy: {
+                    createdAt: "desc",
+                  },
+
+                  take: 100,
+                },
+              },
+            },
+          },
+        });
+
+      if (!customer) {
+        return res.status(404).json({
+          error: "Customer not found.",
+        });
+      }
+
+      if (customer.role !== "CUSTOMER") {
+        return res.status(403).json({
+          error:
+            "Store Cash can only be managed for customer accounts.",
+        });
+      }
+
+      return res.json({
+        customer: {
+          id: customer.id,
+          name: customer.name,
+          phone: customer.phone,
+        },
+
+        balance:
+          customer.storeCash?.balance || 0,
+
+        transactions:
+          customer.storeCash?.transactions || [],
+      });
+    } catch (err) {
+      console.error(
+        "Get Store Cash error:",
+        err
+      );
+
+      return res.status(500).json({
+        error:
+          "Could not load Store Cash.",
+      });
+    }
+  }
+);
+
+// Give Store Cash to a customer
+router.post(
+  "/customers/:id/store-cash",
+  async (req, res) => {
+    try {
+      const schema = z.object({
+        amount: z
+          .number()
+          .positive()
+          .max(100000),
+
+        description: z
+          .string()
+          .trim()
+          .max(250)
+          .optional(),
+      });
+
+      const parsed =
+        schema.safeParse(req.body);
+
+      if (!parsed.success) {
+        return res.status(400).json({
+          error:
+            parsed.error.errors[0].message,
+        });
+      }
+
+      const customer =
+        await prisma.user.findUnique({
+          where: {
+            id: req.params.id,
+          },
+
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            role: true,
+            isActive: true,
+          },
+        });
+
+      if (!customer) {
+        return res.status(404).json({
+          error: "Customer not found.",
+        });
+      }
+
+      if (customer.role !== "CUSTOMER") {
+        return res.status(403).json({
+          error:
+            "Store Cash can only be given to customers.",
+        });
+      }
+
+      if (!customer.isActive) {
+        return res.status(400).json({
+          error:
+            "This customer account is disabled.",
+        });
+      }
+
+      const amount = parsed.data.amount;
+
+      const result =
+        await prisma.$transaction(
+          async (tx) => {
+            // Create the wallet if this is
+            // the customer's first Store Cash.
+            const storeCash =
+              await tx.storeCash.upsert({
+                where: {
+                  userId: customer.id,
+                },
+
+                create: {
+                  userId: customer.id,
+                  balance: amount,
+                },
+
+                update: {
+                  balance: {
+                    increment: amount,
+                  },
+                },
+              });
+
+            const balanceAfter =
+              Number(storeCash.balance);
+
+            const balanceBefore =
+              balanceAfter - amount;
+
+            const transaction =
+              await tx.storeCashTransaction.create({
+                data: {
+                  userId: customer.id,
+                  storeCashId: storeCash.id,
+
+                  type: "CREDIT",
+
+                  amount,
+
+                  balanceBefore,
+                  balanceAfter,
+
+                  description:
+                    parsed.data.description ||
+                    "Store Cash added by admin",
+
+                  reference:
+                    `ADMIN-${req.user.id}`,
+                },
+              });
+
+            return {
+              storeCash,
+              transaction,
+            };
+          }
+        );
+
+      return res.status(201).json({
+        message:
+          "Store Cash added successfully.",
+
+        customer: {
+          id: customer.id,
+          name: customer.name,
+          phone: customer.phone,
+        },
+
+        balance:
+          result.storeCash.balance,
+
+        transaction:
+          result.transaction,
+      });
+    } catch (err) {
+      console.error(
+        "Add Store Cash error:",
+        err
+      );
+
+      return res.status(500).json({
+        error:
+          "Could not add Store Cash.",
+      });
+    }
+  }
+);
+
+
+// Give Store Cash to ALL active customers
+router.post(
+  "/store-cash/all",
+  async (req, res) => {
+    try {
+      const schema = z.object({
+        amount: z.number().positive().max(100000),
+        description: z.string().trim().max(250).optional(),
+      });
+
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0].message });
+      }
+
+      const amount = parsed.data.amount;
+      const description = parsed.data.description || "Free Store Cash";
+
+      const result = await prisma.$transaction(async (tx) => {
+        const customers = await tx.user.findMany({
+          where: { role: "CUSTOMER", isActive: true },
+          select: { id: true },
+        });
+
+        if (customers.length === 0) {
+          return { customerCount: 0, totalAmount: 0 };
+        }
+
+        let totalAmount = 0;
+
+        for (const customer of customers) {
+          const storeCash = await tx.storeCash.upsert({
+            where: { userId: customer.id },
+            create: { userId: customer.id, balance: amount },
+            update: { balance: { increment: amount } },
+          });
+
+          const balanceAfter = Number(storeCash.balance);
+          const balanceBefore = balanceAfter - amount;
+
+          await tx.storeCashTransaction.create({
+            data: {
+              userId: customer.id,
+              storeCashId: storeCash.id,
+              type: "CREDIT",
+              amount,
+              balanceBefore,
+              balanceAfter,
+              description,
+              reference: `ADMIN-BULK-${req.user.id}`,
+            },
+          });
+
+          totalAmount += amount;
+        }
+
+        return { customerCount: customers.length, totalAmount };
+      });
+
+      if (result.customerCount === 0) {
+        return res.status(400).json({ error: "There are no active customers." });
+      }
+
+      return res.status(201).json({
+        message: `₹${result.totalAmount.toFixed(2)} Store Cash given to ${result.customerCount} active customers successfully.`,
+        customerCount: result.customerCount,
+        amountPerCustomer: amount,
+        totalAmount: result.totalAmount,
+      });
+    } catch (err) {
+      console.error("Bulk Store Cash error:", err);
+      return res.status(500).json({ error: "Could not give Store Cash to all customers." });
+    }
+  }
+);
+
+
+// ============================================================
+// ENABLE / DISABLE CUSTOMER
+// ============================================================
+
 router.patch(
   "/customers/:id/status",
   async (req, res) => {
@@ -485,13 +800,13 @@ router.patch(
 // ============================================================
 // DELETE CUSTOMER
 // ============================================================
+
 // Used for removing test/customer accounts.
 //
 // IMPORTANT:
 // Customers who already have orders are NOT deleted.
 // Their order history must remain intact.
 // Use Disable instead for those accounts.
-// ============================================================
 
 router.delete(
   "/customers/:id",
@@ -578,6 +893,21 @@ router.delete(
             },
           });
 
+          // Store Cash
+          // Explicitly remove transaction history
+          // before deleting the wallet.
+          await tx.storeCashTransaction.deleteMany({
+            where: {
+              userId: customer.id,
+            },
+          });
+
+          await tx.storeCash.deleteMany({
+            where: {
+              userId: customer.id,
+            },
+          });
+
           // Finally delete user
           await tx.user.delete({
             where: {
@@ -640,10 +970,12 @@ router.get("/coupons", async (req, res) => {
 const couponSchema = z.object({
   code: z.string().min(3),
   description: z.string().optional(),
+
   discountType: z.enum([
     "PERCENT",
     "FLAT",
   ]),
+
   discountValue: z.number().positive(),
   minOrderValue: z.number().optional(),
   maxDiscount: z.number().optional(),
@@ -899,6 +1231,7 @@ router.post(
       const schema = z.object({
         phone: z.string().min(10),
         name: z.string().min(1),
+
         role: z.enum([
           "ADMIN",
           "STAFF",
