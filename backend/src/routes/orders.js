@@ -121,7 +121,7 @@ router.post("/orders/checkout", async (req, res) => {
 
  // Development payment mode.
 // No real Razorpay order is created while running locally.
-if (process.env.NODE_ENV !== "production") {
+if (process.env.RAZORPAY_TEST_MODE !== "true") {
   return res.status(201).json({
     order,
     devPayment: true,
