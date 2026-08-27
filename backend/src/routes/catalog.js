@@ -2,164 +2,410 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../prismaClient.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
-import { slugify, calculateDiscountPct } from "../utils/pricing.js";
+import {
+  slugify,
+  calculateDiscountPct,
+} from "../utils/pricing.js";
 
 const router = Router();
 
-// ---- Categories ----
+// ============================================================
+// CATEGORIES
+// ============================================================
 
 router.get("/categories", async (req, res) => {
-  const categories = await prisma.category.findMany({
-    where: { isActive: true },
-    orderBy: { sortOrder: "asc" },
-  });
+  try {
+    const categories =
+      await prisma.category.findMany({
+        where: {
+          isActive: true,
+        },
 
-  res.json(categories);
-});
+        orderBy: {
+          sortOrder: "asc",
+        },
+      });
 
-router.post("/categories", requireAuth, requireAdmin, async (req, res) => {
-  const schema = z.object({
-    name: z.string().min(1),
-    imageUrl: z.string().optional(),
-    sortOrder: z.number().optional(),
-  });
+    return res.json(categories);
+  } catch (err) {
+    console.error(
+      "Categories load error:",
+      err
+    );
 
-  const parsed = schema.safeParse(req.body);
-
-  if (!parsed.success) {
-    return res.status(400).json({
-      error: parsed.error.errors[0].message,
+    return res.status(500).json({
+      error: "Could not load categories.",
     });
   }
+});
 
-  const { name, imageUrl, sortOrder } = parsed.data;
+router.post(
+  "/categories",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    const schema = z.object({
+      name: z.string().min(1),
+      imageUrl: z.string().optional(),
+      sortOrder: z.number().optional(),
+    });
 
-  const category = await prisma.category.create({
-    data: {
-      name: name.trim(),
-      slug: slugify(name.trim()),
+    const parsed =
+      schema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        error:
+          parsed.error.errors[0].message,
+      });
+    }
+
+    const {
+      name,
       imageUrl,
-      sortOrder: sortOrder || 0,
-    },
-  });
+      sortOrder,
+    } = parsed.data;
 
-  res.status(201).json(category);
-});
-
-router.put("/categories/:id", requireAuth, requireAdmin, async (req, res) => {
-  const { id } = req.params;
-  const { name, imageUrl, isActive, sortOrder } = req.body;
-
-  const category = await prisma.category.update({
-    where: { id },
-    data: {
-      ...(name && {
-        name: name.trim(),
-        slug: slugify(name.trim()),
-      }),
-      ...(imageUrl !== undefined && { imageUrl }),
-      ...(isActive !== undefined && { isActive }),
-      ...(sortOrder !== undefined && { sortOrder }),
-    },
-  });
-
-  res.json(category);
-});
-
-router.delete("/categories/:id", requireAuth, requireAdmin, async (req, res) => {
-  await prisma.category.update({
-    where: { id: req.params.id },
-    data: { isActive: false },
-  });
-
-  res.json({ message: "Category deactivated" });
-});
-
-// ---- Products ----
-
-router.get("/products", async (req, res) => {
-  const {
-    q,
-    category,
-    minPrice,
-    maxPrice,
-    page = "1",
-    limit = "20",
-  } = req.query;
-
-  const where = {
-    isActive: true,
-
-    ...(q && {
-      name: {
-        contains: String(q),
-        mode: "insensitive",
-      },
-    }),
-
-    ...(category && {
-      category: {
-        slug: String(category),
-      },
-    }),
-
-    ...(minPrice || maxPrice
-      ? {
-          sellingPrice: {
-            ...(minPrice && { gte: Number(minPrice) }),
-            ...(maxPrice && { lte: Number(maxPrice) }),
+    try {
+      const category =
+        await prisma.category.create({
+          data: {
+            name: name.trim(),
+            slug: slugify(name.trim()),
+            imageUrl,
+            sortOrder: sortOrder || 0,
           },
-        }
-      : {}),
-  };
+        });
 
-  const take = Math.min(Number(limit) || 20, 100);
-  const skip =
-    (Math.max(Number(page) || 1, 1) - 1) * take;
+      return res.status(201).json(category);
+    } catch (err) {
+      console.error(
+        "Create category error:",
+        err
+      );
 
-  const [products, total] = await Promise.all([
-    prisma.product.findMany({
-      where,
-      include: { category: true },
-      take,
-      skip,
-      orderBy: { createdAt: "desc" },
-    }),
+      return res.status(500).json({
+        error: "Could not create category.",
+      });
+    }
+  }
+);
 
-    prisma.product.count({ where }),
-  ]);
+router.put(
+  "/categories/:id",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const {
+        name,
+        imageUrl,
+        isActive,
+        sortOrder,
+      } = req.body;
 
-  res.json({
-    products,
-    total,
-    page: Number(page),
-    pageSize: take,
-  });
-});
+      const category =
+        await prisma.category.update({
+          where: {
+            id: req.params.id,
+          },
 
-router.get("/products/:idOrSlug", async (req, res) => {
-  const { idOrSlug } = req.params;
+          data: {
+            ...(name && {
+              name: name.trim(),
+              slug: slugify(name.trim()),
+            }),
 
-  const product = await prisma.product.findFirst({
-    where: {
-      OR: [
-        { id: idOrSlug },
-        { slug: idOrSlug },
-      ],
-    },
-    include: { category: true },
-  });
+            ...(imageUrl !== undefined && {
+              imageUrl,
+            }),
 
-  if (!product) {
-    return res.status(404).json({
-      error: "Product not found",
+            ...(isActive !== undefined && {
+              isActive,
+            }),
+
+            ...(sortOrder !== undefined && {
+              sortOrder,
+            }),
+          },
+        });
+
+      return res.json(category);
+    } catch (err) {
+      console.error(
+        "Update category error:",
+        err
+      );
+
+      return res.status(500).json({
+        error: "Could not update category.",
+      });
+    }
+  }
+);
+
+router.delete(
+  "/categories/:id",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      await prisma.category.update({
+        where: {
+          id: req.params.id,
+        },
+
+        data: {
+          isActive: false,
+        },
+      });
+
+      return res.json({
+        message: "Category deactivated",
+      });
+    } catch (err) {
+      console.error(
+        "Delete category error:",
+        err
+      );
+
+      return res.status(500).json({
+        error:
+          "Could not deactivate category.",
+      });
+    }
+  }
+);
+
+// ============================================================
+// PRODUCTS
+// ============================================================
+
+// Customer product listing.
+//
+// Stock priority:
+//   1. LOW STOCK
+//   2. NORMAL STOCK
+//   3. OUT OF STOCK
+//
+// This ordering is done AFTER retrieving the filtered products,
+// so the customer sees products that actually need attention first.
+//
+// Note:
+// Pagination is intentionally handled after stock-priority sorting
+// to avoid pushing low-stock products onto later pages.
+router.get("/products", async (req, res) => {
+  try {
+    const {
+      q,
+      category,
+      minPrice,
+      maxPrice,
+      page = "1",
+      limit = "20",
+    } = req.query;
+
+    const where = {
+      isActive: true,
+
+      ...(q && {
+        name: {
+          contains: String(q),
+          mode: "insensitive",
+        },
+      }),
+
+      ...(category && {
+        category: {
+          slug: String(category),
+        },
+      }),
+
+      ...(minPrice || maxPrice
+        ? {
+            sellingPrice: {
+              ...(minPrice && {
+                gte: Number(minPrice),
+              }),
+
+              ...(maxPrice && {
+                lte: Number(maxPrice),
+              }),
+            },
+          }
+        : {}),
+    };
+
+    const requestedLimit = Math.min(
+      Number(limit) || 20,
+      100
+    );
+
+    const requestedPage = Math.max(
+      Number(page) || 1,
+      1
+    );
+
+    // Fetch all filtered products first.
+    // This allows stock-priority sorting to happen
+    // before pagination.
+    const allProducts =
+      await prisma.product.findMany({
+        where,
+
+        include: {
+          category: true,
+        },
+
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+    // --------------------------------------------------------
+    // Stock priority
+    // --------------------------------------------------------
+    //
+    // LOW STOCK:
+    //   stock > 0 AND stock <= lowStockAlert
+    //
+    // NORMAL:
+    //   stock > lowStockAlert
+    //
+    // OUT OF STOCK:
+    //   stock === 0
+    //
+    // Lower priority number appears first.
+    // --------------------------------------------------------
+
+    const getStockPriority = (
+      product
+    ) => {
+      const stock = Number(
+        product.stockQty || 0
+      );
+
+      const alert = Number(
+        product.lowStockAlert || 10
+      );
+
+      if (stock === 0) {
+        return 2;
+      }
+
+      if (stock <= alert) {
+        return 0;
+      }
+
+      return 1;
+    };
+
+    allProducts.sort((a, b) => {
+      const priorityA =
+        getStockPriority(a);
+
+      const priorityB =
+        getStockPriority(b);
+
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+
+      // Within the same stock group,
+      // newest products remain first.
+      return (
+        new Date(b.createdAt) -
+        new Date(a.createdAt)
+      );
+    });
+
+    const total =
+      allProducts.length;
+
+    const skip =
+      (requestedPage - 1) *
+      requestedLimit;
+
+    const products =
+      allProducts.slice(
+        skip,
+        skip + requestedLimit
+      );
+
+    return res.json({
+      products,
+      total,
+      page: requestedPage,
+      pageSize: requestedLimit,
+      totalPages: Math.ceil(
+        total / requestedLimit
+      ),
+    });
+  } catch (err) {
+    console.error(
+      "Products load error:",
+      err
+    );
+
+    return res.status(500).json({
+      error: "Could not load products.",
     });
   }
-
-  res.json(product);
 });
 
-// ---- Product validation ----
+// ============================================================
+// SINGLE PRODUCT
+// ============================================================
+
+router.get(
+  "/products/:idOrSlug",
+  async (req, res) => {
+    try {
+      const {
+        idOrSlug,
+      } = req.params;
+
+      const product =
+        await prisma.product.findFirst({
+          where: {
+            OR: [
+              {
+                id: idOrSlug,
+              },
+              {
+                slug: idOrSlug,
+              },
+            ],
+          },
+
+          include: {
+            category: true,
+          },
+        });
+
+      if (!product) {
+        return res.status(404).json({
+          error: "Product not found",
+        });
+      }
+
+      return res.json(product);
+    } catch (err) {
+      console.error(
+        "Product load error:",
+        err
+      );
+
+      return res.status(500).json({
+        error: "Could not load product.",
+      });
+    }
+  }
+);
+
+// ============================================================
+// PRODUCT VALIDATION
+// ============================================================
 
 const productSchema = z.object({
   name: z.string().min(1),
@@ -168,226 +414,319 @@ const productSchema = z.object({
   mrp: z.number().positive(),
   sellingPrice: z.number().positive(),
   categoryId: z.string().uuid(),
-  stockQty: z.number().int().min(0).default(0),
+
+  stockQty: z
+    .number()
+    .int()
+    .min(0)
+    .default(0),
+
   imageUrl: z.string().optional(),
   images: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
 });
 
-// ---- Create Product ----
+// ============================================================
+// CREATE PRODUCT
+// ============================================================
 
-router.post("/products", requireAuth, requireAdmin, async (req, res) => {
-  const parsed = productSchema.safeParse(req.body);
+router.post(
+  "/products",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    const parsed =
+      productSchema.safeParse(
+        req.body
+      );
 
-  if (!parsed.success) {
-    return res.status(400).json({
-      error: parsed.error.errors[0].message,
-    });
-  }
-
-  const data = parsed.data;
-
-  // Normalize product identity.
-  const normalizedName = data.name.trim();
-  const normalizedUnit = data.unit.trim();
-
-  // -------------------------------------------------------
-  // DUPLICATE PRODUCT PROTECTION
-  // -------------------------------------------------------
-  //
-  // A product is considered duplicate when:
-  //   - name is the same (case-insensitive)
-  //   - unit is the same (case-insensitive)
-  //   - product is still active
-  //
-  // Example:
-  // Apples + KG
-  // apples + kg
-  //
-  // These will be treated as the same product.
-  // -------------------------------------------------------
-
-  const existingProduct = await prisma.product.findFirst({
-    where: {
-      isActive: true,
-
-      name: {
-        equals: normalizedName,
-        mode: "insensitive",
-      },
-
-      unit: {
-        equals: normalizedUnit,
-        mode: "insensitive",
-      },
-    },
-  });
-
-  if (existingProduct) {
-    return res.status(409).json({
-      error: `Product "${existingProduct.name} (${existingProduct.unit})" already exists.`,
-      productId: existingProduct.id,
-    });
-  }
-
-  const discountPct = calculateDiscountPct(
-    data.mrp,
-    data.sellingPrice
-  );
-
-  try {
-    const product = await prisma.product.create({
-      data: {
-        ...data,
-        name: normalizedName,
-        unit: normalizedUnit,
-        slug: `${slugify(normalizedName)}-${Date.now().toString(36)}`,
-        discountPct,
-      },
-    });
-
-    res.status(201).json(product);
-  } catch (err) {
-    console.error("Create product error:", err);
-
-    res.status(500).json({
-      error: "Could not create product",
-    });
-  }
-});
-
-// ---- Update Product ----
-
-router.put("/products/:id", requireAuth, requireAdmin, async (req, res) => {
-  const parsed = productSchema.partial().safeParse(req.body);
-
-  if (!parsed.success) {
-    return res.status(400).json({
-      error: parsed.error.errors[0].message,
-    });
-  }
-
-  const data = parsed.data;
-
-  // If name or unit is being changed, check for duplicates.
-  if (data.name || data.unit) {
-    const currentProduct = await prisma.product.findUnique({
-      where: { id: req.params.id },
-    });
-
-    if (!currentProduct) {
-      return res.status(404).json({
-        error: "Product not found",
+    if (!parsed.success) {
+      return res.status(400).json({
+        error:
+          parsed.error.errors[0].message,
       });
     }
 
-    const checkName = (data.name || currentProduct.name).trim();
-    const checkUnit = (data.unit || currentProduct.unit).trim();
+    const data = parsed.data;
 
-    const duplicate = await prisma.product.findFirst({
-      where: {
-        id: {
-          not: req.params.id,
+    const normalizedName =
+      data.name.trim();
+
+    const normalizedUnit =
+      data.unit.trim();
+
+    const existingProduct =
+      await prisma.product.findFirst({
+        where: {
+          isActive: true,
+
+          name: {
+            equals: normalizedName,
+            mode: "insensitive",
+          },
+
+          unit: {
+            equals: normalizedUnit,
+            mode: "insensitive",
+          },
         },
+      });
 
-        isActive: true,
-
-        name: {
-          equals: checkName,
-          mode: "insensitive",
-        },
-
-        unit: {
-          equals: checkUnit,
-          mode: "insensitive",
-        },
-      },
-    });
-
-    if (duplicate) {
+    if (existingProduct) {
       return res.status(409).json({
-        error: `Another product "${duplicate.name} (${duplicate.unit})" already exists.`,
-        productId: duplicate.id,
+        error: `Product "${existingProduct.name} (${existingProduct.unit})" already exists.`,
+        productId:
+          existingProduct.id,
       });
     }
 
-    data.name = checkName;
-    data.unit = checkUnit;
+    const discountPct =
+      calculateDiscountPct(
+        data.mrp,
+        data.sellingPrice
+      );
+
+    try {
+      const product =
+        await prisma.product.create({
+          data: {
+            ...data,
+
+            name: normalizedName,
+            unit: normalizedUnit,
+
+            slug: `${slugify(
+              normalizedName
+            )}-${Date.now().toString(36)}`,
+
+            discountPct,
+          },
+        });
+
+      return res.status(201).json(
+        product
+      );
+    } catch (err) {
+      console.error(
+        "Create product error:",
+        err
+      );
+
+      return res.status(500).json({
+        error:
+          "Could not create product",
+      });
+    }
   }
+);
 
-  // Recalculate discount when price changes.
-  if (
-    data.mrp !== undefined &&
-    data.sellingPrice !== undefined
-  ) {
-    data.discountPct = calculateDiscountPct(
-      data.mrp,
-      data.sellingPrice
-    );
-  } else if (
-    data.mrp !== undefined ||
-    data.sellingPrice !== undefined
-  ) {
-    const currentProduct = await prisma.product.findUnique({
-      where: { id: req.params.id },
-    });
+// ============================================================
+// UPDATE PRODUCT
+// ============================================================
 
-    if (!currentProduct) {
-      return res.status(404).json({
-        error: "Product not found",
+router.put(
+  "/products/:id",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    const parsed =
+      productSchema
+        .partial()
+        .safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        error:
+          parsed.error.errors[0].message,
       });
     }
 
-    const mrp =
-      data.mrp !== undefined
-        ? data.mrp
-        : Number(currentProduct.mrp);
+    const data = parsed.data;
 
-    const sellingPrice =
-      data.sellingPrice !== undefined
-        ? data.sellingPrice
-        : Number(currentProduct.sellingPrice);
+    try {
+      if (data.name || data.unit) {
+        const currentProduct =
+          await prisma.product.findUnique(
+            {
+              where: {
+                id: req.params.id,
+              },
+            }
+          );
 
-    data.discountPct = calculateDiscountPct(
-      mrp,
-      sellingPrice
-    );
+        if (!currentProduct) {
+          return res.status(404).json({
+            error:
+              "Product not found",
+          });
+        }
+
+        const checkName =
+          (
+            data.name ||
+            currentProduct.name
+          ).trim();
+
+        const checkUnit =
+          (
+            data.unit ||
+            currentProduct.unit
+          ).trim();
+
+        const duplicate =
+          await prisma.product.findFirst(
+            {
+              where: {
+                id: {
+                  not: req.params.id,
+                },
+
+                isActive: true,
+
+                name: {
+                  equals: checkName,
+                  mode: "insensitive",
+                },
+
+                unit: {
+                  equals: checkUnit,
+                  mode: "insensitive",
+                },
+              },
+            }
+          );
+
+        if (duplicate) {
+          return res.status(409).json({
+            error: `Another product "${duplicate.name} (${duplicate.unit})" already exists.`,
+            productId:
+              duplicate.id,
+          });
+        }
+
+        data.name = checkName;
+        data.unit = checkUnit;
+      }
+
+      // Recalculate discount.
+      if (
+        data.mrp !== undefined &&
+        data.sellingPrice !==
+          undefined
+      ) {
+        data.discountPct =
+          calculateDiscountPct(
+            data.mrp,
+            data.sellingPrice
+          );
+      } else if (
+        data.mrp !== undefined ||
+        data.sellingPrice !==
+          undefined
+      ) {
+        const currentProduct =
+          await prisma.product.findUnique(
+            {
+              where: {
+                id: req.params.id,
+              },
+            }
+          );
+
+        if (!currentProduct) {
+          return res.status(404).json({
+            error:
+              "Product not found",
+          });
+        }
+
+        const mrp =
+          data.mrp !== undefined
+            ? data.mrp
+            : Number(
+                currentProduct.mrp
+              );
+
+        const sellingPrice =
+          data.sellingPrice !==
+          undefined
+            ? data.sellingPrice
+            : Number(
+                currentProduct.sellingPrice
+              );
+
+        data.discountPct =
+          calculateDiscountPct(
+            mrp,
+            sellingPrice
+          );
+      }
+
+      const product =
+        await prisma.product.update({
+          where: {
+            id: req.params.id,
+          },
+
+          data,
+        });
+
+      return res.json(product);
+    } catch (err) {
+      console.error(
+        "Update product error:",
+        err
+      );
+
+      return res.status(500).json({
+        error:
+          "Could not update product",
+      });
+    }
   }
+);
 
-  try {
-    const product = await prisma.product.update({
-      where: {
-        id: req.params.id,
-      },
-      data,
-    });
+// ============================================================
+// REMOVE PRODUCT
+// ============================================================
 
-    res.json(product);
-  } catch (err) {
-    console.error("Update product error:", err);
+router.delete(
+  "/products/:id",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      await prisma.product.update({
+        where: {
+          id: req.params.id,
+        },
 
-    res.status(500).json({
-      error: "Could not update product",
-    });
+        data: {
+          isActive: false,
+        },
+      });
+
+      return res.json({
+        message:
+          "Product deactivated",
+      });
+    } catch (err) {
+      console.error(
+        "Delete product error:",
+        err
+      );
+
+      return res.status(500).json({
+        error:
+          "Could not deactivate product.",
+      });
+    }
   }
-});
+);
 
-// ---- Remove Product ----
-
-router.delete("/products/:id", requireAuth, requireAdmin, async (req, res) => {
-  await prisma.product.update({
-    where: { id: req.params.id },
-    data: {
-      isActive: false,
-    },
-  });
-
-  res.json({
-    message: "Product deactivated",
-  });
-});
-
-// ---- Inventory ----
+// ============================================================
+// INVENTORY
+// ============================================================
 
 router.patch(
   "/products/:id/stock",
@@ -395,29 +734,52 @@ router.patch(
   requireAdmin,
   async (req, res) => {
     const schema = z.object({
-      stockQty: z.number().int().min(0),
+      stockQty: z
+        .number()
+        .int()
+        .min(0),
     });
 
-    const parsed = schema.safeParse(req.body);
+    const parsed =
+      schema.safeParse(req.body);
 
     if (!parsed.success) {
       return res.status(400).json({
-        error: parsed.error.errors[0].message,
+        error:
+          parsed.error.errors[0].message,
       });
     }
 
-    const product = await prisma.product.update({
-      where: {
-        id: req.params.id,
-      },
+    try {
+      const product =
+        await prisma.product.update({
+          where: {
+            id: req.params.id,
+          },
 
-      data: {
-        stockQty: parsed.data.stockQty,
-      },
-    });
+          data: {
+            stockQty:
+              parsed.data.stockQty,
+          },
+        });
 
-    res.json(product);
+      return res.json(product);
+    } catch (err) {
+      console.error(
+        "Stock update error:",
+        err
+      );
+
+      return res.status(500).json({
+        error:
+          "Could not update stock.",
+      });
+    }
   }
 );
+
+// ============================================================
+// DEFAULT EXPORT
+// ============================================================
 
 export default router;
