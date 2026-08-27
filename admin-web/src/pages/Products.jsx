@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
 import Layout from "../components/Layout";
 
@@ -13,14 +13,124 @@ const EMPTY = {
   imageUrl: "",
 };
 
+const REFRESH_INTERVAL = 10000;
+
 export default function Products() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [editing, setEditing] = useState(null); // product id, or "new"
+  const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // ----------------------------------------
+  // Load products
+  // ----------------------------------------
+
+  const loadProducts = useCallback(async (showLoading = false) => {
+    if (showLoading) {
+      setLoading(true);
+    }
+
+    try {
+      const res = await api.get("/products", {
+        params: {
+          limit: 100,
+        },
+      });
+
+      setProducts(res.data.products || []);
+    } catch (err) {
+      console.error("Could not load products:", err);
+
+      if (showLoading) {
+        setError(
+          err.response?.data?.error ||
+            "Could not load products"
+        );
+      }
+    } finally {
+      if (showLoading) {
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  // ----------------------------------------
+  // Initial load
+  // ----------------------------------------
+
+  useEffect(() => {
+    loadProducts(true);
+
+    api
+      .get("/categories")
+      .then((res) => {
+        setCategories(res.data || []);
+      })
+      .catch((err) => {
+        setError(
+          err.response?.data?.error ||
+            "Could not load categories"
+        );
+      });
+  }, [loadProducts]);
+
+  // ----------------------------------------
+  // AUTOMATIC PRODUCT/STOCK REFRESH
+  // ----------------------------------------
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadProducts(false);
+    }, REFRESH_INTERVAL);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [loadProducts]);
+
+  // ----------------------------------------
+  // Refresh when admin returns to tab
+  // ----------------------------------------
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        loadProducts(false);
+      }
+    }
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+    };
+  }, [loadProducts]);
+
+  // ----------------------------------------
+  // Refresh when internet reconnects
+  // ----------------------------------------
+
+  useEffect(() => {
+    function handleOnline() {
+      loadProducts(false);
+    }
+
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [loadProducts]);
 
   // ----------------------------------------
   // Image upload
@@ -50,52 +160,13 @@ export default function Products() {
       }));
     } catch (err) {
       setError(
-        err.response?.data?.error || "Image upload failed"
+        err.response?.data?.error ||
+          "Image upload failed"
       );
     } finally {
       setUploading(false);
     }
   }
-
-  // ----------------------------------------
-  // Load products
-  // ----------------------------------------
-
-  async function loadProducts() {
-    try {
-      const res = await api.get("/products", {
-        params: {
-          limit: 100,
-        },
-      });
-
-      setProducts(res.data.products || []);
-    } catch (err) {
-      setError(
-        err.response?.data?.error || "Could not load products"
-      );
-    }
-  }
-
-  // ----------------------------------------
-  // Initial load
-  // ----------------------------------------
-
-  useEffect(() => {
-    loadProducts();
-
-    api
-      .get("/categories")
-      .then((res) => {
-        setCategories(res.data || []);
-      })
-      .catch((err) => {
-        setError(
-          err.response?.data?.error ||
-            "Could not load categories"
-        );
-      });
-  }, []);
 
   // ----------------------------------------
   // Edit product
@@ -150,12 +221,10 @@ export default function Products() {
   async function save(e) {
     e.preventDefault();
 
-    // Prevent double click / duplicate requests
     if (saving) return;
 
     setError("");
 
-    // Basic validation
     const name = form.name.trim();
     const unit = form.unit.trim();
 
@@ -211,17 +280,14 @@ export default function Products() {
         await api.put(`/products/${editing}`, payload);
       }
 
-      // Close form after successful save
       setEditing(null);
       setForm(EMPTY);
 
-      // Refresh product list
-      await loadProducts();
+      await loadProducts(false);
     } catch (err) {
       const status = err.response?.status;
       const message = err.response?.data?.error;
 
-      // PostgreSQL unique constraint / duplicate product
       if (
         status === 409 ||
         message?.toLowerCase().includes("duplicate") ||
@@ -255,7 +321,7 @@ export default function Products() {
 
     try {
       await api.delete(`/products/${id}`);
-      await loadProducts();
+      await loadProducts(false);
     } catch (err) {
       setError(
         err.response?.data?.error ||
@@ -269,12 +335,17 @@ export default function Products() {
   // ----------------------------------------
 
   async function quickStock(id, stockQty) {
+    if (!Number.isFinite(stockQty) || stockQty < 0) {
+      setError("Stock quantity cannot be negative.");
+      return;
+    }
+
     try {
       await api.patch(`/products/${id}/stock`, {
         stockQty: Number(stockQty),
       });
 
-      await loadProducts();
+      await loadProducts(false);
     } catch (err) {
       setError(
         err.response?.data?.error ||
@@ -312,8 +383,6 @@ export default function Products() {
           onSubmit={save}
           className="bg-white rounded-xl2 border border-ink/10 p-4 mb-5 grid md:grid-cols-2 gap-3"
         >
-          {/* Product Name */}
-
           <input
             required
             placeholder="Product name"
@@ -326,8 +395,6 @@ export default function Products() {
             }
             className="border border-ink/15 rounded-lg px-3 py-2 text-sm"
           />
-
-          {/* Category */}
 
           <select
             required
@@ -354,8 +421,6 @@ export default function Products() {
             ))}
           </select>
 
-          {/* Unit */}
-
           <input
             required
             placeholder="Unit (e.g. 1 kg)"
@@ -368,8 +433,6 @@ export default function Products() {
             }
             className="border border-ink/15 rounded-lg px-3 py-2 text-sm"
           />
-
-          {/* Image URL / Upload */}
 
           <div className="flex items-center gap-2">
             <input
@@ -399,8 +462,6 @@ export default function Products() {
             </label>
           </div>
 
-          {/* Image Preview */}
-
           {form.imageUrl && (
             <img
               src={form.imageUrl}
@@ -408,8 +469,6 @@ export default function Products() {
               className="w-16 h-16 object-cover rounded-lg border border-ink/10"
             />
           )}
-
-          {/* MRP */}
 
           <input
             required
@@ -427,8 +486,6 @@ export default function Products() {
             className="border border-ink/15 rounded-lg px-3 py-2 text-sm"
           />
 
-          {/* Selling Price */}
-
           <input
             required
             type="number"
@@ -445,8 +502,6 @@ export default function Products() {
             className="border border-ink/15 rounded-lg px-3 py-2 text-sm"
           />
 
-          {/* Stock */}
-
           <input
             required
             type="number"
@@ -462,8 +517,6 @@ export default function Products() {
             className="border border-ink/15 rounded-lg px-3 py-2 text-sm"
           />
 
-          {/* Description */}
-
           <textarea
             placeholder="Description"
             value={form.description}
@@ -477,15 +530,11 @@ export default function Products() {
             rows={2}
           />
 
-          {/* Error */}
-
           {error && (
             <p className="text-sm text-red-600 md:col-span-2">
               {error}
             </p>
           )}
-
-          {/* Buttons */}
 
           <div className="md:col-span-2 flex gap-2">
             <button
@@ -546,101 +595,132 @@ export default function Products() {
                 Stock
               </th>
 
+              <th className="px-4 py-2">
+                Status
+              </th>
+
               <th className="px-4 py-2"></th>
             </tr>
           </thead>
 
           <tbody>
-            {products.map((p) => (
-              <tr
-                key={p.id}
-                className="border-t border-ink/5"
-              >
-                {/* Product */}
-
-                <td className="px-4 py-2 font-medium">
-                  {p.name}{" "}
-                  <span className="text-ink/40 font-normal">
-                    ({p.unit})
-                  </span>
-                </td>
-
-                {/* Category */}
-
-                <td className="px-4 py-2 text-ink/60">
-                  {p.category?.name || "-"}
-                </td>
-
-                {/* Price */}
-
-                <td className="px-4 py-2">
-                  ₹{Number(p.sellingPrice)}
-                </td>
-
-                {/* Stock */}
-
-                <td className="px-4 py-2">
-                  <input
-                    type="number"
-                    min="0"
-                    defaultValue={p.stockQty}
-                    onBlur={(e) => {
-                      const newValue = Number(
-                        e.target.value
-                      );
-
-                      if (
-                        newValue !==
-                        Number(p.stockQty)
-                      ) {
-                        quickStock(
-                          p.id,
-                          newValue
-                        );
-                      }
-                    }}
-                    className={`w-16 border rounded px-2 py-1 text-xs ${
-                      p.stockQty <=
-                      p.lowStockAlert
-                        ? "border-mango text-mango"
-                        : "border-ink/15"
-                    }`}
-                  />
-                </td>
-
-                {/* Actions */}
-
-                <td className="px-4 py-2 text-right space-x-2">
-                  <button
-                    onClick={() =>
-                      startEdit(p)
-                    }
-                    className="text-leaf font-medium"
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      deleteProduct(p.id)
-                    }
-                    className="text-red-500 font-medium"
-                  >
-                    Remove
-                  </button>
+            {loading ? (
+              <tr>
+                <td
+                  colSpan="6"
+                  className="px-4 py-8 text-center text-ink/50"
+                >
+                  Loading products...
                 </td>
               </tr>
-            ))}
+            ) : products.length === 0 ? (
+              <tr>
+                <td
+                  colSpan="6"
+                  className="px-4 py-8 text-center text-ink/50"
+                >
+                  No products found.
+                </td>
+              </tr>
+            ) : (
+              products.map((p) => {
+                const stock = Number(p.stockQty);
+                const lowStock =
+                  stock > 0 &&
+                  stock <= Number(p.lowStockAlert || 10);
+                const outOfStock = stock <= 0;
+
+                return (
+                  <tr
+                    key={p.id}
+                    className="border-t border-ink/5"
+                  >
+                    <td className="px-4 py-2 font-medium">
+                      {p.name}{" "}
+                      <span className="text-ink/40 font-normal">
+                        ({p.unit})
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-2 text-ink/60">
+                      {p.category?.name || "-"}
+                    </td>
+
+                    <td className="px-4 py-2">
+                      ₹{Number(p.sellingPrice)}
+                    </td>
+
+                    <td className="px-4 py-2">
+                      <input
+                        type="number"
+                        min="0"
+                        defaultValue={stock}
+                        onBlur={(e) => {
+                          const newValue = Number(
+                            e.target.value
+                          );
+
+                          if (
+                            Number.isFinite(newValue) &&
+                            newValue !== stock
+                          ) {
+                            quickStock(
+                              p.id,
+                              newValue
+                            );
+                          }
+                        }}
+                        className={`w-16 border rounded px-2 py-1 text-xs ${
+                          outOfStock
+                            ? "border-red-400 text-red-600"
+                            : lowStock
+                            ? "border-mango text-mango"
+                            : "border-ink/15"
+                        }`}
+                      />
+                    </td>
+
+                    <td className="px-4 py-2">
+                      {outOfStock ? (
+                        <span className="text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded-full">
+                          OUT OF STOCK
+                        </span>
+                      ) : lowStock ? (
+                        <span className="text-xs font-semibold text-mango bg-mango/10 px-2 py-1 rounded-full">
+                          LOW STOCK
+                        </span>
+                      ) : (
+                        <span className="text-xs font-medium text-leaf bg-leaf-light px-2 py-1 rounded-full">
+                          IN STOCK
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="px-4 py-2 text-right space-x-2">
+                      <button
+                        onClick={() =>
+                          startEdit(p)
+                        }
+                        className="text-leaf font-medium"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          deleteProduct(p.id)
+                        }
+                        className="text-red-500 font-medium"
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
-
-        {/* Empty state */}
-
-        {products.length === 0 && (
-          <div className="text-center py-10 text-ink/40 text-sm">
-            No products found.
-          </div>
-        )}
       </div>
     </Layout>
   );
