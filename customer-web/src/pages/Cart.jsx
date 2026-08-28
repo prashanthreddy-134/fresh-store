@@ -51,13 +51,18 @@ function Cart() {
     Number(subtotal) - storeCashToUse
   );
 
-  function goToCheckout() {
-    navigate("/checkout", {
-      state: {
-        storeCashToUse,
-      },
-    });
-  }
+ function goToCheckout() {
+  sessionStorage.setItem(
+    "freshStoreCashToUse",
+    String(storeCashToUse)
+  );
+
+  navigate("/checkout", {
+    state: {
+      storeCashToUse,
+    },
+  });
+}
 
   return (
     <div className="min-h-screen bg-cream">
@@ -312,7 +317,7 @@ function Cart() {
               onClick={goToCheckout}
               className="w-full bg-leaf text-cream rounded-xl py-3 font-semibold"
             >
-              Back to Checkout →
+             Continue to Checkout →
             </button>
 
             <Link
