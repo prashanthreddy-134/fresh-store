@@ -165,9 +165,7 @@ router.post("/orders/checkout", async (req, res) => {
       });
     }
 
-    if (
-      Number(item.quantity) <= 0
-    ) {
+    if (Number(item.quantity) <= 0) {
       return res.status(400).json({
         error: `Invalid quantity for ${item.product.name}`,
       });
@@ -275,11 +273,10 @@ router.post("/orders/checkout", async (req, res) => {
   // ==========================================================
   // FINAL TOTAL
   // ==========================================================
-  //
+
   // NO DELIVERY FEE.
   //
   // subtotal - discount - Store Cash
-  //
 
   const total = Math.max(
     0,
@@ -340,14 +337,12 @@ router.post("/orders/checkout", async (req, res) => {
             finalStoreCashUsed > 0
           ) {
             const currentStoreCash =
-              await tx.storeCash.findUnique(
-                {
-                  where: {
-                    userId:
-                      req.user.id,
-                  },
-                }
-              );
+              await tx.storeCash.findUnique({
+                where: {
+                  userId:
+                    req.user.id,
+                },
+              });
 
             if (!currentStoreCash) {
               finalStoreCashUsed = 0;
@@ -385,47 +380,46 @@ router.post("/orders/checkout", async (req, res) => {
                 // DEDUCT STORE CASH
                 // ----------------------------------------------
 
-                await tx.storeCash.update(
-                  {
-                    where: {
-                      id:
-                        currentStoreCash.id,
-                    },
+                await tx.storeCash.update({
+                  where: {
+                    id:
+                      currentStoreCash.id,
+                  },
 
-                    data: {
-                      balance:
-                        balanceAfter,
-                    },
-                  }
-                );
+                  data: {
+                    balance:
+                      balanceAfter,
+                  },
+                });
 
                 // ----------------------------------------------
                 // CREATE STORE CASH TRANSACTION
                 // ----------------------------------------------
 
-                await tx.storeCashTransaction.create(
-                  {
-                    data: {
-                      storeCashId:
-                        currentStoreCash.id,
+                await tx.storeCashTransaction.create({
+                  data: {
+                    userId:
+                      req.user.id,
 
-                      type: "DEBIT",
+                    storeCashId:
+                      currentStoreCash.id,
 
-                      amount:
-                        finalStoreCashUsed,
+                    type: "DEBIT",
 
-                      balanceBefore,
+                    amount:
+                      finalStoreCashUsed,
 
-                      balanceAfter,
+                    balanceBefore,
 
-                      description:
-                        `Store Cash used for order ${orderNumber}`,
+                    balanceAfter,
 
-                      reference:
-                        orderNumber,
-                    },
-                  }
-                );
+                    description:
+                      `Store Cash used for order ${orderNumber}`,
+
+                    reference:
+                      orderNumber,
+                  },
+                });
               }
             }
           }
@@ -436,39 +430,35 @@ router.post("/orders/checkout", async (req, res) => {
 
           for (const item of cartItems) {
             const result =
-              await tx.product.updateMany(
-                {
-                  where: {
-                    id:
-                      item.productId,
+              await tx.product.updateMany({
+                where: {
+                  id:
+                    item.productId,
 
-                    stockQty: {
-                      gte:
-                        item.quantity,
-                    },
+                  stockQty: {
+                    gte:
+                      item.quantity,
                   },
+                },
 
-                  data: {
-                    stockQty: {
-                      decrement:
-                        item.quantity,
-                    },
+                data: {
+                  stockQty: {
+                    decrement:
+                      item.quantity,
                   },
-                }
-              );
+                },
+              });
 
             if (
               result.count === 0
             ) {
               const fresh =
-                await tx.product.findUnique(
-                  {
-                    where: {
-                      id:
-                        item.productId,
-                    },
-                  }
-                );
+                await tx.product.findUnique({
+                  where: {
+                    id:
+                      item.productId,
+                  },
+                });
 
               throw new Error(
                 `Only ${
@@ -674,14 +664,12 @@ router.post("/orders/checkout", async (req, res) => {
         await prisma.$transaction(
           async (tx) => {
             const cash =
-              await tx.storeCash.findUnique(
-                {
-                  where: {
-                    userId:
-                      req.user.id,
-                  },
-                }
-              );
+              await tx.storeCash.findUnique({
+                where: {
+                  userId:
+                    req.user.id,
+                },
+              });
 
             if (!cash) {
               return;
@@ -701,41 +689,40 @@ router.post("/orders/checkout", async (req, res) => {
               balanceBefore +
               amount;
 
-            await tx.storeCash.update(
-              {
-                where: {
-                  id: cash.id,
-                },
+            await tx.storeCash.update({
+              where: {
+                id: cash.id,
+              },
 
-                data: {
-                  balance:
-                    balanceAfter,
-                },
-              }
-            );
-
-            await tx.storeCashTransaction.create(
-              {
-                data: {
-                  storeCashId:
-                    cash.id,
-
-                  type: "CREDIT",
-
-                  amount,
-
-                  balanceBefore,
-
+              data: {
+                balance:
                   balanceAfter,
+              },
+            });
 
-                  description:
-                    `Store Cash refunded because payment could not be initiated for order ${order.orderNumber}`,
+            await tx.storeCashTransaction.create({
+              data: {
+                userId:
+                  req.user.id,
 
-                  reference:
-                    order.orderNumber,
-                },
-              }
-            );
+                storeCashId:
+                  cash.id,
+
+                type: "CREDIT",
+
+                amount,
+
+                balanceBefore,
+
+                balanceAfter,
+
+                description:
+                  `Store Cash refunded because payment could not be initiated for order ${order.orderNumber}`,
+
+                reference:
+                  order.orderNumber,
+              },
+            });
           }
         );
       } catch (refundCashError) {
@@ -1021,14 +1008,12 @@ router.post(
         await prisma.$transaction(
           async (tx) => {
             const cash =
-              await tx.storeCash.findUnique(
-                {
-                  where: {
-                    userId:
-                      order.userId,
-                  },
-                }
-              );
+              await tx.storeCash.findUnique({
+                where: {
+                  userId:
+                    order.userId,
+                },
+              });
 
             if (!cash) {
               return;
@@ -1060,29 +1045,30 @@ router.post(
               },
             });
 
-            await tx.storeCashTransaction.create(
-              {
-                data: {
-                  storeCashId:
-                    cash.id,
+            await tx.storeCashTransaction.create({
+              data: {
+                userId:
+                  order.userId,
 
-                  type:
-                    "CREDIT",
+                storeCashId:
+                  cash.id,
 
-                  amount,
+                type:
+                  "CREDIT",
 
-                  balanceBefore,
+                amount,
 
-                  balanceAfter,
+                balanceBefore,
 
-                  description:
-                    `Store Cash refunded for cancelled order ${order.orderNumber}`,
+                balanceAfter,
 
-                  reference:
-                    order.orderNumber,
-                },
-              }
-            );
+                description:
+                  `Store Cash refunded for cancelled order ${order.orderNumber}`,
+
+                reference:
+                  order.orderNumber,
+              },
+            });
           }
         );
       } catch (err) {
