@@ -187,6 +187,9 @@ router.post("/orders/checkout", async (req, res) => {
   // ==========================================================
   // COUPON
   // ==========================================================
+  // ==========================================================
+  // COUPON
+  // ==========================================================
 
   let discount = 0;
   let coupon = null;
@@ -198,41 +201,9 @@ router.post("/orders/checkout", async (req, res) => {
     const normalizedCoupon =
       couponCode.trim().toUpperCase();
 
-    // ========================================================
-    // FRESH50 - FIRST ORDER ONLY
-    // ========================================================
-    //
-    // A user can use FRESH50 only when they have never
-    // successfully paid for an order before.
-    //
-    // Failed, cancelled, or unpaid orders do NOT consume
-    // the first-order coupon.
-    //
-    // ========================================================
-
-    if (normalizedCoupon === "FRESH50") {
-      const previousPaidOrder =
-        await prisma.order.findFirst({
-          where: {
-            userId: req.user.id,
-            paymentStatus: "PAID",
-          },
-          select: {
-            id: true,
-          },
-        });
-
-      if (previousPaidOrder) {
-        return res.status(400).json({
-          error:
-            "FRESH50 is available only for your first order.",
-        });
-      }
-    }
-
-    // ========================================================
+    // --------------------------------------------------------
     // FIND COUPON
-    // ========================================================
+    // --------------------------------------------------------
 
     coupon =
       await prisma.coupon.findUnique({
@@ -241,23 +212,307 @@ router.post("/orders/checkout", async (req, res) => {
         },
       });
 
-    const usable =
-      isCouponUsable(
-        coupon,
-        subtotal
-      );
-
-    if (!usable.ok) {
+    if (!coupon) {
       return res.status(400).json({
-        error: usable.reason,
+        error: "Invalid coupon code.",
       });
     }
+
+    // --------------------------------------------------------
+    // BASIC COUPON VALIDATION
+    // --------------------------------------------------------
+
+    const now = new Date();
+
+    if (!coupon.isActive) {
+      return res.status(400).json({
+        error: "This coupon is no longer active.",
+      });
+    }
+
+    if (
+      coupon.validFrom &&
+      now < coupon.validFrom
+    ) {
+      return res.status(400).json({
+        error:
+          "This coupon is not active yet.",
+      });
+    }
+
+    if (
+      coupon.validTill &&
+      now > coupon.validTill
+    ) {
+      return res.status(400).json({
+        error:
+          "This coupon has expired.",
+      });
+    }
+
+    // --------------------------------------------------------
+    // GLOBAL USAGE LIMIT
+    // --------------------------------------------------------
+
+    if (
+      coupon.usageLimit !== null &&
+      coupon.usageLimit !== undefined &&
+      coupon.usedCount >= coupon.usageLimit
+    ) {
+      return res.status(400).json({
+        error:
+          "This coupon has reached its usage limit.",
+      });
+    }
+
+    // --------------------------------------------------------
+    // MINIMUM ORDER VALUE
+    // --------------------------------------------------------
+
+    if (
+      coupon.minOrderValue !== null &&
+      coupon.minOrderValue !== undefined &&
+      subtotal <
+        Number(coupon.minOrderValue)
+    ) {
+      return res.status(400).json({
+        error:
+          `Minimum order value for this coupon is ₹${Number(
+            coupon.minOrderValue
+          ).toFixed(2)}.`,
+      });
+    }
+
+    // --------------------------------------------------------
+    // CUSTOMER USAGE RULE
+    // --------------------------------------------------------
+
+    const usageRule =
+      String(
+        coupon.usageRule ||
+          "UNLIMITED"
+      ).toUpperCase();
+
+    // --------------------------------------------------------
+    // FIRST ORDER
+    // --------------------------------------------------------
+
+    if (
+      usageRule ===
+      "FIRST_ORDER"
+    ) {
+      const previousPaidOrder =
+        await prisma.order.findFirst({
+          where: {
+            userId:
+              req.user.id,
+
+            paymentStatus:
+              "PAID",
+          },
+
+          select: {
+            id: true,
+          },
+        });
+
+      if (previousPaidOrder) {
+        return res.status(400).json({
+          error:
+            "This coupon is available only for your first order.",
+        });
+      }
+
+      // Also check CouponUsage in case an old
+      // successful usage exists without the order
+      // relationship being sufficient.
+
+      const previousCouponUsage =
+        await prisma.couponUsage.findFirst({
+          where: {
+            userId:
+              req.user.id,
+
+            couponId:
+              coupon.id,
+          },
+
+          select: {
+            id: true,
+          },
+        });
+
+      if (previousCouponUsage) {
+        return res.status(400).json({
+          error:
+            "You have already used this first-order coupon.",
+        });
+      }
+    }
+
+    // --------------------------------------------------------
+    // ONCE EVER
+    // --------------------------------------------------------
+
+    if (
+      usageRule ===
+      "ONCE_EVER"
+    ) {
+      const previousUsage =
+        await prisma.couponUsage.findFirst({
+          where: {
+            userId:
+              req.user.id,
+
+            couponId:
+              coupon.id,
+          },
+
+          select: {
+            id: true,
+          },
+        });
+
+      if (previousUsage) {
+        return res.status(400).json({
+          error:
+            "You have already used this coupon.",
+        });
+      }
+    }
+
+    // --------------------------------------------------------
+    // ONCE PER MONTH
+    // --------------------------------------------------------
+
+    if (
+      usageRule ===
+      "ONCE_PER_MONTH"
+    ) {
+      const currentYear =
+        now.getFullYear();
+
+      const currentMonth =
+        now.getMonth() + 1;
+
+      const monthlyUsage =
+        await prisma.couponUsage.findFirst({
+          where: {
+            userId:
+              req.user.id,
+
+            couponId:
+              coupon.id,
+
+            usageYear:
+              currentYear,
+
+            usageMonth:
+              currentMonth,
+          },
+
+          select: {
+            id: true,
+          },
+        });
+
+      if (monthlyUsage) {
+        return res.status(400).json({
+          error:
+            "You have already used this coupon this month. It will be available again next month.",
+        });
+      }
+    }
+
+    // --------------------------------------------------------
+    // UNKNOWN USAGE RULE
+    // --------------------------------------------------------
+
+    if (
+      ![
+        "UNLIMITED",
+        "FIRST_ORDER",
+        "ONCE_EVER",
+        "ONCE_PER_MONTH",
+      ].includes(usageRule)
+    ) {
+      return res.status(400).json({
+        error:
+          "This coupon has an invalid usage rule.",
+      });
+    }
+
+    // --------------------------------------------------------
+    // PAYMENT METHOD REQUIREMENT
+    // --------------------------------------------------------
+    //
+    // IMPORTANT:
+    //
+    // At checkout creation time Razorpay payment method
+    // has NOT been selected yet.
+    //
+    // Therefore a CARD / DEBIT_CARD / CREDIT_CARD / UPI /
+    // NETBANKING coupon cannot be permanently validated
+    // here.
+    //
+    // The frontend must send the selected payment method
+    // once it is known, and the payment verification
+    // layer must validate it before accepting the coupon.
+    //
+    // For now:
+    // ANY -> allowed
+    // anything else -> checked against optional request
+    // paymentMethod.
+    //
+
+    const requiredPaymentMethod =
+      String(
+        coupon.paymentMethod ||
+          "ANY"
+      ).toUpperCase();
+
+    const selectedPaymentMethod =
+      String(
+        req.body.paymentMethod ||
+          "ANY"
+      ).toUpperCase();
+
+    if (
+      requiredPaymentMethod !==
+        "ANY" &&
+      selectedPaymentMethod !==
+        requiredPaymentMethod
+    ) {
+      return res.status(400).json({
+        error:
+          `This coupon is valid only with ${requiredPaymentMethod.replace(
+            /_/g,
+            " "
+          )}.`,
+      });
+    }
+
+    // --------------------------------------------------------
+    // CALCULATE DISCOUNT
+    // --------------------------------------------------------
 
     discount =
       calculateCouponDiscount(
         subtotal,
         coupon
       );
+
+    // --------------------------------------------------------
+    // NEVER ALLOW DISCOUNT ABOVE SUBTOTAL
+    // --------------------------------------------------------
+
+    discount = Math.min(
+      Math.max(
+        0,
+        Number(discount)
+      ),
+      subtotal
+    );
   }
 
   // ==========================================================

@@ -2,9 +2,6 @@
 // One database, consumed by:
 // customer mobile app, customer website,
 // admin mobile app, admin website
-//
-// Run:
-// npx prisma migrate dev --name add_store_cash
 
 generator client {
   provider = "prisma-client-js"
@@ -15,7 +12,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ---------- Users & Auth ----------
+// ============================================================
+// USERS & AUTH
+// ============================================================
 
 enum Role {
   CUSTOMER
@@ -24,28 +23,31 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  phone        String   @unique
-  name         String?
-  email        String?
-  role         Role     @default(CUSTOMER)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id        String   @id @default(uuid())
+  phone     String   @unique
+  name      String?
+  email     String?
+  role      Role     @default(CUSTOMER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  addresses       Address[]
-  cartItems       CartItem[]
-  wishlist        WishlistItem[]
-  orders          Order[]
-  otps            OtpRequest[]
-  notifications   Notification[]
-  pushTokens      PushToken[]
+  addresses     Address[]
+  cartItems     CartItem[]
+  wishlist      WishlistItem[]
+  orders        Order[]
+  otps          OtpRequest[]
+  notifications Notification[]
+  pushTokens    PushToken[]
 
   storeCash             StoreCash?
   storeCashTransactions StoreCashTransaction[]
+  couponUsages          CouponUsage[]
 }
 
-// ---------- Store Cash ----------
+// ============================================================
+// STORE CASH
+// ============================================================
 
 model StoreCash {
   id     String @id @default(uuid())
@@ -53,7 +55,7 @@ model StoreCash {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  balance Decimal @db.Decimal(10, 2) @default(0)
+  balance Decimal @default(0) @db.Decimal(10, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -72,10 +74,10 @@ model StoreCashTransaction {
   id String @id @default(uuid())
 
   userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   storeCashId String
-  storeCash StoreCash @relation(fields: [storeCashId], references: [id], onDelete: Cascade)
+  storeCash   StoreCash @relation(fields: [storeCashId], references: [id], onDelete: Cascade)
 
   type StoreCashTransactionType
 
@@ -85,8 +87,7 @@ model StoreCashTransaction {
 
   description String?
 
-  orderId String?
-
+  orderId   String?
   reference String?
 
   createdAt DateTime @default(now())
@@ -96,7 +97,9 @@ model StoreCashTransaction {
   @@index([createdAt])
 }
 
-// ---------- Push Tokens ----------
+// ============================================================
+// PUSH TOKENS
+// ============================================================
 
 model PushToken {
   id        String   @id @default(uuid())
@@ -107,7 +110,9 @@ model PushToken {
   createdAt DateTime @default(now())
 }
 
-// ---------- OTP ----------
+// ============================================================
+// OTP
+// ============================================================
 
 model OtpRequest {
   id        String   @id @default(uuid())
@@ -120,12 +125,14 @@ model OtpRequest {
   createdAt DateTime @default(now())
 
   userId String?
-  user   User? @relation(fields: [userId], references: [id])
+  user   User?   @relation(fields: [userId], references: [id])
 
   @@index([phone, purpose])
 }
 
-// ---------- Catalog ----------
+// ============================================================
+// CATALOG
+// ============================================================
 
 model Category {
   id        String  @id @default(uuid())
@@ -141,11 +148,11 @@ model Category {
 }
 
 model Product {
-  id            String   @id @default(uuid())
-  name          String
-  slug          String   @unique
-  description   String?
-  unit          String
+  id          String  @id @default(uuid())
+  name        String
+  slug        String  @unique
+  description String?
+  unit        String
 
   mrp          Decimal  @db.Decimal(10, 2)
   sellingPrice Decimal  @db.Decimal(10, 2)
@@ -175,13 +182,15 @@ model Product {
   @@index([name])
 }
 
-// ---------- Cart / Wishlist ----------
+// ============================================================
+// CART / WISHLIST
+// ============================================================
 
 model CartItem {
   id String @id @default(uuid())
 
   userId String
-  user   User @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
   productId String
   product   Product @relation(fields: [productId], references: [id])
@@ -198,7 +207,7 @@ model WishlistItem {
   id String @id @default(uuid())
 
   userId String
-  user   User @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
   productId String
   product   Product @relation(fields: [productId], references: [id])
@@ -208,21 +217,23 @@ model WishlistItem {
   @@unique([userId, productId])
 }
 
-// ---------- Addresses ----------
+// ============================================================
+// ADDRESSES
+// ============================================================
 
 model Address {
   id String @id @default(uuid())
 
   userId String
-  user   User @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
-  label     String
-  line1     String
-  line2     String?
-  landmark  String?
-  city      String
-  state     String
-  pincode   String
+  label    String
+  line1    String
+  line2    String?
+  landmark String?
+  city     String
+  state    String
+  pincode  String
 
   latitude  Float?
   longitude Float?
@@ -234,7 +245,9 @@ model Address {
   orders Order[]
 }
 
-// ---------- Coupons ----------
+// ============================================================
+// COUPONS
+// ============================================================
 
 model Coupon {
   id String @id @default(uuid())
@@ -243,14 +256,41 @@ model Coupon {
 
   description String?
 
-  discountType  String
+  // PERCENT or FLAT
+  discountType String
+
   discountValue Decimal @db.Decimal(10, 2)
 
   minOrderValue Decimal? @db.Decimal(10, 2)
   maxDiscount   Decimal? @db.Decimal(10, 2)
 
+  // Global usage limit
   usageLimit Int?
-  usedCount  Int @default(0)
+  usedCount  Int  @default(0)
+
+  // ==========================================================
+  // CUSTOMER USAGE RULE
+  //
+  // UNLIMITED
+  // FIRST_ORDER
+  // ONCE_EVER
+  // ONCE_PER_MONTH
+  // ==========================================================
+
+  usageRule String @default("UNLIMITED")
+
+  // ==========================================================
+  // PAYMENT METHOD REQUIREMENT
+  //
+  // ANY
+  // CARD
+  // DEBIT_CARD
+  // CREDIT_CARD
+  // UPI
+  // NETBANKING
+  // ==========================================================
+
+  paymentMethod String @default("ANY")
 
   isActive Boolean @default(true)
 
@@ -258,9 +298,60 @@ model Coupon {
   validTill DateTime?
 
   orders Order[]
+
+  usages CouponUsage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([isActive])
+  @@index([validFrom])
+  @@index([validTill])
 }
 
-// ---------- Orders ----------
+// ============================================================
+// COUPON USAGE
+//
+// This table records exactly which customer used which coupon.
+//
+// This allows:
+//
+// FIRST_ORDER
+// ONCE_EVER
+// ONCE_PER_MONTH
+//
+// Failed payments do NOT need to create a usage record.
+// Usage should be created only after successful payment.
+// ============================================================
+
+model CouponUsage {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  couponId String
+  coupon   Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  usedAt DateTime @default(now())
+
+  // Stored separately so monthly usage checks are simple
+  usageYear  Int
+  usageMonth Int
+
+  @@unique([orderId])
+  @@index([userId])
+  @@index([couponId])
+  @@index([userId, couponId])
+  @@index([userId, couponId, usageYear, usageMonth])
+}
+
+// ============================================================
+// ORDERS
+// ============================================================
 
 enum OrderStatus {
   PENDING_PAYMENT
@@ -284,21 +375,23 @@ model Order {
   orderNumber String @unique
 
   userId String
-  user   User @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
   addressId String
   address   Address @relation(fields: [addressId], references: [id])
 
   items OrderItem[]
 
-  subtotal    Decimal @db.Decimal(10, 2)
-  discount    Decimal @db.Decimal(10, 2) @default(0)
-  deliveryFee Decimal @db.Decimal(10, 2) @default(0)
-  total       Decimal @db.Decimal(10, 2)
-    storeCashUsed Decimal @db.Decimal(10, 2) @default(0)
+  subtotal      Decimal @db.Decimal(10, 2)
+  discount      Decimal @default(0) @db.Decimal(10, 2)
+  deliveryFee   Decimal @default(0) @db.Decimal(10, 2)
+  total         Decimal @db.Decimal(10, 2)
+  storeCashUsed Decimal @default(0) @db.Decimal(10, 2)
 
   couponId String?
   coupon   Coupon? @relation(fields: [couponId], references: [id])
+
+  couponUsage CouponUsage?
 
   status        OrderStatus   @default(PENDING_PAYMENT)
   paymentStatus PaymentStatus @default(CREATED)
@@ -307,7 +400,7 @@ model Order {
   razorpayPaymentId String?
   razorpaySignature String?
 
-  placedAt DateTime @default(now())
+  placedAt  DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   deliveredAt  DateTime?
@@ -317,11 +410,15 @@ model Order {
   statusHistory OrderStatusEvent[]
 }
 
+// ============================================================
+// ORDER ITEMS
+// ============================================================
+
 model OrderItem {
   id String @id @default(uuid())
 
   orderId String
-  order   Order @relation(fields: [orderId], references: [id])
+  order   Order  @relation(fields: [orderId], references: [id])
 
   productId String
   product   Product @relation(fields: [productId], references: [id])
@@ -334,11 +431,15 @@ model OrderItem {
   quantity Int
 }
 
+// ============================================================
+// ORDER STATUS HISTORY
+// ============================================================
+
 model OrderStatusEvent {
   id String @id @default(uuid())
 
   orderId String
-  order   Order @relation(fields: [orderId], references: [id])
+  order   Order  @relation(fields: [orderId], references: [id])
 
   status OrderStatus
 
@@ -349,13 +450,15 @@ model OrderStatusEvent {
   changedBy String?
 }
 
-// ---------- Notifications ----------
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
 
 model Notification {
   id String @id @default(uuid())
 
   userId String
-  user   User @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
   channel String
 

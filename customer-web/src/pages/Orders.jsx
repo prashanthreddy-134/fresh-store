@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import NavBar from "../components/NavBar";
 
-const ORDER_REFRESH_INTERVAL = 10000; // 10 seconds
+const ORDER_REFRESH_INTERVAL = 10000;
 
 const STATUS_COLORS = {
   PENDING_PAYMENT: "bg-ink/10 text-ink/60",
@@ -13,6 +13,19 @@ const STATUS_COLORS = {
   DELIVERED: "bg-leaf text-cream",
   CANCELLED: "bg-red-100 text-red-600",
 };
+
+function formatStatus(status) {
+  return String(status || "")
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) =>
+      letter.toUpperCase()
+    );
+}
+
+function money(value) {
+  return `₹${Number(value || 0).toFixed(2)}`;
+}
 
 export default function Orders() {
   const navigate = useNavigate();
@@ -28,9 +41,16 @@ export default function Orders() {
 
       try {
         const res = await api.get("/orders");
-        setOrders(res.data || []);
+        setOrders(
+          Array.isArray(res.data)
+            ? res.data
+            : []
+        );
       } catch (err) {
-        console.error("Could not load orders:", err);
+        console.error(
+          "Could not load orders:",
+          err
+        );
       } finally {
         if (showLoading) {
           setLoading(false);
@@ -45,7 +65,7 @@ export default function Orders() {
     loadOrders(true);
   }, [loadOrders]);
 
-  // Automatically check for order/status changes
+  // Automatically refresh order status
   useEffect(() => {
     const interval = setInterval(() => {
       loadOrders(false);
@@ -56,10 +76,13 @@ export default function Orders() {
     };
   }, [loadOrders]);
 
-  // Immediately refresh when customer returns to the tab
+  // Refresh when customer returns to tab
   useEffect(() => {
     function handleVisibilityChange() {
-      if (document.visibilityState === "visible") {
+      if (
+        document.visibilityState ===
+        "visible"
+      ) {
         loadOrders(false);
       }
     }
@@ -77,16 +100,22 @@ export default function Orders() {
     };
   }, [loadOrders]);
 
-  // Refresh when internet connection returns
+  // Refresh when internet returns
   useEffect(() => {
     function handleOnline() {
       loadOrders(false);
     }
 
-    window.addEventListener("online", handleOnline);
+    window.addEventListener(
+      "online",
+      handleOnline
+    );
 
     return () => {
-      window.removeEventListener("online", handleOnline);
+      window.removeEventListener(
+        "online",
+        handleOnline
+      );
     };
   }, [loadOrders]);
 
@@ -96,63 +125,223 @@ export default function Orders() {
 
       <div className="max-w-2xl mx-auto px-4 py-6">
 
-        {/* Back to Profile */}
+        {/* ==================================================
+            HEADER
+           ================================================== */}
+
         <button
-          onClick={() => navigate("/profile")}
+          type="button"
+          onClick={() =>
+            navigate("/profile")
+          }
           className="flex items-center gap-2 text-sm font-medium text-leaf hover:opacity-70 transition mb-6"
         >
-          <span className="text-lg">←</span>
+          <span className="text-lg">
+            ←
+          </span>
           Back to Profile
         </button>
 
-        <h1 className="font-display font-800 text-xl mb-4">
-          Your orders
-        </h1>
+        <div className="flex items-center justify-between mb-5">
+          <h1 className="font-display font-800 text-xl">
+            My Orders
+          </h1>
 
-        {loading ? (
-          <p className="text-ink/40 text-center py-16">
-            Loading orders...
-          </p>
-        ) : orders.length === 0 ? (
-          <p className="text-ink/40 text-center py-16">
-            No orders yet.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {orders.map((o) => (
-              <Link
-                key={o.id}
-                to={`/orders/${o.id}`}
-                className="block bg-white rounded-xl2 border border-ink/10 p-4"
-              >
-                <div className="flex justify-between items-start mb-1">
-                  <span className="font-semibold text-sm">
-                    {o.orderNumber}
-                  </span>
+          <button
+            type="button"
+            onClick={() =>
+              loadOrders(false)
+            }
+            className="text-xs font-semibold text-leaf"
+          >
+            Refresh
+          </button>
+        </div>
 
-                  <span
-                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      STATUS_COLORS[o.status] ||
-                      "bg-ink/10 text-ink/60"
-                    }`}
-                  >
-                    {o.status.replace(/_/g, " ")}
-                  </span>
-                </div>
+        {/* ==================================================
+            LOADING
+           ================================================== */}
 
-                <p className="text-xs text-ink/50">
-                  {new Date(o.placedAt).toLocaleString()}
-                </p>
-
-                <p className="text-sm mt-1">
-                  {o.items.length} item
-                  {o.items.length > 1 ? "s" : ""} · ₹
-                  {Number(o.total).toFixed(2)}
-                </p>
-              </Link>
-            ))}
+        {loading && (
+          <div className="text-center py-12 text-ink/40">
+            Loading your orders...
           </div>
         )}
+
+        {/* ==================================================
+            EMPTY
+           ================================================== */}
+
+        {!loading &&
+          orders.length === 0 && (
+            <div className="bg-white rounded-xl2 border border-ink/10 p-8 text-center">
+              <div className="text-4xl mb-3">
+                🛍️
+              </div>
+
+              <h2 className="font-display font-800 text-lg">
+                No orders yet
+              </h2>
+
+              <p className="text-sm text-ink/50 mt-1 mb-5">
+                Your completed orders will
+                appear here.
+              </p>
+
+              <Link
+                to="/"
+                className="inline-block bg-leaf text-cream rounded-xl px-5 py-3 font-semibold"
+              >
+                Start Shopping
+              </Link>
+            </div>
+          )}
+
+        {/* ==================================================
+            ORDER LIST
+           ================================================== */}
+
+        {!loading &&
+          orders.length > 0 && (
+            <div className="space-y-4">
+              {orders.map((order) => {
+                const status =
+                  String(
+                    order.status || ""
+                  ).toUpperCase();
+
+                const statusClass =
+                  STATUS_COLORS[status] ||
+                  "bg-ink/10 text-ink/60";
+
+                return (
+                  <div
+                    key={order.id}
+                    className="bg-white rounded-xl2 border border-ink/10 p-4"
+                  >
+
+                    {/* ----------------------------------------
+                        ORDER HEADER
+                       ---------------------------------------- */}
+
+                    <div className="flex justify-between items-start gap-3">
+
+                      <div>
+                        <h2 className="font-display font-800 text-base">
+                          {order.orderNumber}
+                        </h2>
+
+                        <p className="text-xs text-ink/50 mt-1">
+                          {order.placedAt
+                            ? new Date(
+                                order.placedAt
+                              ).toLocaleString()
+                            : "Date unavailable"}
+                        </p>
+                      </div>
+
+                      <span
+                        className={`text-[11px] px-2.5 py-1 rounded-full font-semibold ${statusClass}`}
+                      >
+                        {formatStatus(status)}
+                      </span>
+                    </div>
+
+                    {/* ----------------------------------------
+                        ITEMS PREVIEW
+                       ---------------------------------------- */}
+
+                    <div className="mt-4 border-t border-ink/5 pt-3">
+                      {Array.isArray(
+                        order.items
+                      ) &&
+                        order.items
+                          .slice(0, 3)
+                          .map((item) => (
+                            <div
+                              key={item.id}
+                              className="flex justify-between text-sm py-1"
+                            >
+                              <span className="text-ink/70">
+                                {item.name} ×{" "}
+                                {item.quantity}
+                              </span>
+
+                              <span>
+                                {money(
+                                  Number(
+                                    item.price
+                                  ) *
+                                    Number(
+                                      item.quantity
+                                    )
+                                )}
+                              </span>
+                            </div>
+                          ))}
+
+                      {Array.isArray(
+                        order.items
+                      ) &&
+                        order.items.length >
+                          3 && (
+                          <p className="text-xs text-ink/40 mt-1">
+                            +
+                            {order.items.length -
+                              3}{" "}
+                            more item
+                            {order.items.length -
+                              3 ===
+                            1
+                              ? ""
+                              : "s"}
+                          </p>
+                        )}
+                    </div>
+
+                    {/* ----------------------------------------
+                        TOTAL
+                       ---------------------------------------- */}
+
+                    <div className="flex justify-between items-center border-t border-ink/10 mt-3 pt-3">
+                      <span className="text-sm text-ink/60">
+                        Total
+                      </span>
+
+                      <span className="font-display font-800">
+                        {money(
+                          order.total
+                        )}
+                      </span>
+                    </div>
+
+                    {/* ----------------------------------------
+                        ACTIONS
+                       ---------------------------------------- */}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
+
+                      <Link
+                        to={`/orders/${order.id}`}
+                        className="w-full text-center border border-leaf text-leaf rounded-xl py-2.5 text-sm font-semibold hover:bg-leaf hover:text-cream transition"
+                      >
+                        View Order
+                      </Link>
+
+                      <Link
+                        to={`/orders/${order.id}/invoice`}
+                        className="w-full text-center bg-leaf text-cream rounded-xl py-2.5 text-sm font-semibold hover:opacity-90 transition"
+                      >
+                        Download Invoice
+                      </Link>
+
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
       </div>
     </div>
   );

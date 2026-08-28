@@ -3,14 +3,34 @@ import { AuthProvider } from "./context/AuthContext";
 import { CartProvider } from "./context/CartContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
+// ============================================================
+// MAIN PAGES
+// ============================================================
+
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
+import Coupons from "./pages/Coupons";
+
+// ============================================================
+// ORDERS
+// ============================================================
+
 import Orders from "./pages/Orders";
 import OrderDetail from "./pages/OrderDetail";
+import Invoice from "./pages/Invoice";
+
+// ============================================================
+// WISHLIST
+// ============================================================
+
 import Wishlist from "./pages/Wishlist";
+
+// ============================================================
+// PROFILE
+// ============================================================
 
 import Profile from "./pages/Profile";
 import ProfileDetails from "./pages/ProfileDetails";
@@ -26,6 +46,10 @@ import ProfileSuggestProducts from "./pages/ProfileSuggestProducts";
 import ProfileNotifications from "./pages/ProfileNotifications";
 import ProfileGeneral from "./pages/ProfileGeneral";
 
+// ============================================================
+// LEGAL
+// ============================================================
+
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import RefundPolicy from "./pages/RefundPolicy";
@@ -37,25 +61,37 @@ export default function App() {
         <BrowserRouter>
           <Routes>
 
-            {/* Home */}
+            {/* ==================================================
+                HOME
+               ================================================== */}
+
             <Route
               path="/"
               element={<Home />}
             />
 
-            {/* Authentication */}
+            {/* ==================================================
+                AUTHENTICATION
+               ================================================== */}
+
             <Route
               path="/login"
               element={<Login />}
             />
 
-            {/* Products */}
+            {/* ==================================================
+                PRODUCTS
+               ================================================== */}
+
             <Route
               path="/product/:idOrSlug"
               element={<ProductDetail />}
             />
 
-            {/* Cart */}
+            {/* ==================================================
+                CART
+               ================================================== */}
+
             <Route
               path="/cart"
               element={
@@ -65,7 +101,10 @@ export default function App() {
               }
             />
 
-            {/* Checkout */}
+            {/* ==================================================
+                CHECKOUT
+               ================================================== */}
+
             <Route
               path="/checkout"
               element={
@@ -75,7 +114,23 @@ export default function App() {
               }
             />
 
-            {/* Orders */}
+            {/* ==================================================
+                COUPONS
+               ================================================== */}
+
+            <Route
+              path="/coupons"
+              element={
+                <ProtectedRoute>
+                  <Coupons />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ==================================================
+                ORDERS
+               ================================================== */}
+
             <Route
               path="/orders"
               element={
@@ -84,6 +139,10 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* ==================================================
+                ORDER DETAIL
+               ================================================== */}
 
             <Route
               path="/orders/:id"
@@ -94,7 +153,23 @@ export default function App() {
               }
             />
 
-            {/* Wishlist */}
+            {/* ==================================================
+                INVOICE
+               ================================================== */}
+
+            <Route
+              path="/orders/:id/invoice"
+              element={
+                <ProtectedRoute>
+                  <Invoice />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ==================================================
+                WISHLIST
+               ================================================== */}
+
             <Route
               path="/wishlist"
               element={
@@ -104,11 +179,10 @@ export default function App() {
               }
             />
 
-            {/* =====================================================
+            {/* ==================================================
                 PROFILE
-               ===================================================== */}
+               ================================================== */}
 
-            {/* Main Profile */}
             <Route
               path="/profile"
               element={
@@ -118,7 +192,10 @@ export default function App() {
               }
             />
 
-            {/* Profile Details */}
+            {/* ==================================================
+                PROFILE DETAILS
+               ================================================== */}
+
             <Route
               path="/profile/details"
               element={
@@ -128,7 +205,10 @@ export default function App() {
               }
             />
 
-            {/* Saved Addresses */}
+            {/* ==================================================
+                SAVED ADDRESSES
+               ================================================== */}
+
             <Route
               path="/profile/addresses"
               element={
@@ -138,7 +218,10 @@ export default function App() {
               }
             />
 
-            {/* Store Cash */}
+            {/* ==================================================
+                STORE CASH
+               ================================================== */}
+
             <Route
               path="/profile/store-cash"
               element={
@@ -148,7 +231,10 @@ export default function App() {
               }
             />
 
-            {/* E-Gift Cards */}
+            {/* ==================================================
+                E-GIFT CARDS
+               ================================================== */}
+
             <Route
               path="/profile/gift-cards"
               element={
@@ -158,7 +244,10 @@ export default function App() {
               }
             />
 
-            {/* Review & Earn */}
+            {/* ==================================================
+                REVIEWS
+               ================================================== */}
+
             <Route
               path="/profile/reviews"
               element={
@@ -168,7 +257,10 @@ export default function App() {
               }
             />
 
-            {/* Refunds */}
+            {/* ==================================================
+                REFUNDS
+               ================================================== */}
+
             <Route
               path="/profile/refunds"
               element={
@@ -178,7 +270,10 @@ export default function App() {
               }
             />
 
-            {/* Rewards */}
+            {/* ==================================================
+                REWARDS
+               ================================================== */}
+
             <Route
               path="/profile/rewards"
               element={
@@ -188,7 +283,10 @@ export default function App() {
               }
             />
 
-            {/* Payment Management */}
+            {/* ==================================================
+                PAYMENT MANAGEMENT
+               ================================================== */}
+
             <Route
               path="/profile/payments"
               element={
@@ -198,7 +296,10 @@ export default function App() {
               }
             />
 
-            {/* Help & Support */}
+            {/* ==================================================
+                HELP & SUPPORT
+               ================================================== */}
+
             <Route
               path="/profile/help"
               element={
@@ -208,7 +309,10 @@ export default function App() {
               }
             />
 
-            {/* Suggest Products */}
+            {/* ==================================================
+                SUGGEST PRODUCTS
+               ================================================== */}
+
             <Route
               path="/profile/suggest-products"
               element={
@@ -218,7 +322,10 @@ export default function App() {
               }
             />
 
-            {/* Notifications */}
+            {/* ==================================================
+                NOTIFICATIONS
+               ================================================== */}
+
             <Route
               path="/profile/notifications"
               element={
@@ -228,7 +335,10 @@ export default function App() {
               }
             />
 
-            {/* General Information */}
+            {/* ==================================================
+                GENERAL INFORMATION
+               ================================================== */}
+
             <Route
               path="/profile/general"
               element={
@@ -238,7 +348,10 @@ export default function App() {
               }
             />
 
-            {/* Legal */}
+            {/* ==================================================
+                LEGAL
+               ================================================== */}
+
             <Route
               path="/terms"
               element={<Terms />}

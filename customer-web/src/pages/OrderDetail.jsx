@@ -12,57 +12,85 @@ const STEPS = [
   "DELIVERED",
 ];
 
+function money(value) {
+  return `₹${Number(value || 0).toFixed(2)}`;
+}
+
+function formatStatus(status) {
+  return String(status || "")
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) =>
+      letter.toUpperCase()
+    );
+}
+
 export default function OrderDetail() {
   const { id } = useParams();
 
   const [order, setOrder] = useState(null);
-  const [cancelling, setCancelling] = useState(false);
+  const [cancelling, setCancelling] =
+    useState(false);
 
   const load = useCallback(async () => {
     try {
-      const res = await api.get(`/orders/${id}`);
+      const res =
+        await api.get(`/orders/${id}`);
+
       setOrder(res.data);
     } catch (err) {
-      console.error("Could not load order:", err);
+      console.error(
+        "Could not load order:",
+        err
+      );
     }
   }, [id]);
 
-  // ------------------------------------------------------------
-  // INITIAL ORDER LOAD
-  // ------------------------------------------------------------
+  // ==========================================================
+  // INITIAL LOAD
+  // ==========================================================
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // ------------------------------------------------------------
-  // AUTOMATIC ORDER STATUS REFRESH
-  // ------------------------------------------------------------
+  // ==========================================================
+  // AUTOMATIC STATUS REFRESH
+  // ==========================================================
 
   useEffect(() => {
     if (
       !order ||
-      ["DELIVERED", "CANCELLED"].includes(order.status)
+      [
+        "DELIVERED",
+        "CANCELLED",
+      ].includes(order.status)
     ) {
       return;
     }
 
-    const interval = setInterval(() => {
-      load();
-    }, ORDER_REFRESH_INTERVAL);
+    const interval = setInterval(
+      () => {
+        load();
+      },
+      ORDER_REFRESH_INTERVAL
+    );
 
     return () => {
       clearInterval(interval);
     };
   }, [order?.status, load]);
 
-  // ------------------------------------------------------------
-  // REFRESH WHEN CUSTOMER RETURNS TO TAB
-  // ------------------------------------------------------------
+  // ==========================================================
+  // REFRESH WHEN TAB RETURNS
+  // ==========================================================
 
   useEffect(() => {
     function handleVisibilityChange() {
-      if (document.visibilityState === "visible") {
+      if (
+        document.visibilityState ===
+        "visible"
+      ) {
         load();
       }
     }
@@ -80,45 +108,58 @@ export default function OrderDetail() {
     };
   }, [load]);
 
-  // ------------------------------------------------------------
-  // REFRESH WHEN INTERNET CONNECTION RETURNS
-  // ------------------------------------------------------------
+  // ==========================================================
+  // REFRESH WHEN INTERNET RETURNS
+  // ==========================================================
 
   useEffect(() => {
     function handleOnline() {
       load();
     }
 
-    window.addEventListener("online", handleOnline);
+    window.addEventListener(
+      "online",
+      handleOnline
+    );
 
     return () => {
-      window.removeEventListener("online", handleOnline);
+      window.removeEventListener(
+        "online",
+        handleOnline
+      );
     };
   }, [load]);
 
-  // ------------------------------------------------------------
+  // ==========================================================
   // CANCEL ORDER
-  // ------------------------------------------------------------
+  // ==========================================================
 
   async function cancelOrder() {
     setCancelling(true);
 
     try {
-      await api.post(`/orders/${id}/cancel`, {
-        reason: "Changed my mind",
-      });
+      await api.post(
+        `/orders/${id}/cancel`,
+        {
+          reason:
+            "Changed my mind",
+        }
+      );
 
       await load();
     } catch (err) {
-      console.error("Could not cancel order:", err);
+      console.error(
+        "Could not cancel order:",
+        err
+      );
     } finally {
       setCancelling(false);
     }
   }
 
-  // ------------------------------------------------------------
+  // ==========================================================
   // LOADING
-  // ------------------------------------------------------------
+  // ==========================================================
 
   if (!order) {
     return (
@@ -126,19 +167,23 @@ export default function OrderDetail() {
         <NavBar />
 
         <div className="text-center py-16 text-ink/40">
-          Loading...
+          Loading order...
         </div>
       </div>
     );
   }
 
-  const currentStepIndex = STEPS.indexOf(order.status);
+  const currentStepIndex =
+    STEPS.indexOf(
+      order.status
+    );
 
-  const cancellable = ![
-    "OUT_FOR_DELIVERY",
-    "DELIVERED",
-    "CANCELLED",
-  ].includes(order.status);
+  const cancellable =
+    ![
+      "OUT_FOR_DELIVERY",
+      "DELIVERED",
+      "CANCELLED",
+    ].includes(order.status);
 
   return (
     <div className="min-h-screen bg-cream">
@@ -146,188 +191,362 @@ export default function OrderDetail() {
 
       <div className="max-w-2xl mx-auto px-4 py-6">
 
-        {/* --------------------------------------------------
-            ORDER HEADING
-        -------------------------------------------------- */}
+        {/* ==================================================
+            BACK
+           ================================================== */}
 
-        <div className="flex justify-between items-start mb-1">
-          <h1 className="font-display font-800 text-xl">
-            {order.orderNumber}
-          </h1>
+        <Link
+          to="/orders"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-leaf mb-5"
+        >
+          ← Back to Orders
+        </Link>
+
+        {/* ==================================================
+            ORDER HEADING
+           ================================================== */}
+
+        <div className="flex justify-between items-start gap-3 mb-1">
+
+          <div>
+            <h1 className="font-display font-800 text-xl">
+              {order.orderNumber}
+            </h1>
+
+            <p className="text-sm text-ink/50 mt-1">
+              {order.placedAt
+                ? new Date(
+                    order.placedAt
+                  ).toLocaleString()
+                : ""}
+            </p>
+          </div>
+
+          {/* INVOICE BUTTON */}
+
+          <Link
+            to={`/orders/${order.id}/invoice`}
+            className="shrink-0 bg-leaf text-cream rounded-xl px-3 py-2 text-xs font-semibold hover:opacity-90 transition"
+          >
+            Invoice
+          </Link>
         </div>
 
-        <p className="text-sm text-ink/50 mb-5">
-          {new Date(order.placedAt).toLocaleString()}
-        </p>
-
-        {/* --------------------------------------------------
+        {/* ==================================================
             CANCELLED
-        -------------------------------------------------- */}
+           ================================================== */}
 
-        {order.status === "CANCELLED" ? (
-          <div className="bg-red-50 text-red-600 rounded-xl2 p-4 mb-6 text-sm">
-            Order cancelled
-            {order.cancelReason
-              ? `: ${order.cancelReason}`
-              : ""}
+        {order.status ===
+        "CANCELLED" ? (
+          <div className="bg-red-50 text-red-600 rounded-xl2 p-4 mb-6 text-sm mt-5">
+            <div className="font-semibold">
+              Order cancelled
+            </div>
+
+            {order.cancelReason && (
+              <div className="mt-1">
+                Reason:{" "}
+                {order.cancelReason}
+              </div>
+            )}
           </div>
         ) : (
           <>
-            {/* --------------------------------------------------
+            {/* ==============================================
                 ORDER PROGRESS
-            -------------------------------------------------- */}
+               ============================================== */}
 
-            <div className="flex items-center mb-6">
-              {STEPS.map((step, i) => (
-                <div
-                  key={step}
-                  className="flex-1 flex items-center"
-                >
+            <div className="flex items-center mt-5 mb-6">
+              {STEPS.map(
+                (step, i) => (
                   <div
-                    className={`w-3 h-3 rounded-full ${
-                      i <= currentStepIndex
-                        ? "bg-leaf"
-                        : "bg-ink/15"
-                    }`}
-                  />
-
-                  {i < STEPS.length - 1 && (
+                    key={step}
+                    className="flex-1 flex items-center"
+                  >
                     <div
-                      className={`flex-1 h-0.5 ${
-                        i < currentStepIndex
+                      className={`w-3 h-3 rounded-full ${
+                        i <=
+                        currentStepIndex
                           ? "bg-leaf"
                           : "bg-ink/15"
                       }`}
                     />
-                  )}
-                </div>
-              ))}
+
+                    {i <
+                      STEPS.length -
+                        1 && (
+                      <div
+                        className={`flex-1 h-0.5 ${
+                          i <
+                          currentStepIndex
+                            ? "bg-leaf"
+                            : "bg-ink/15"
+                        }`}
+                      />
+                    )}
+                  </div>
+                )
+              )}
             </div>
 
-            {/* --------------------------------------------------
+            {/* ==============================================
                 STATUS LABELS
-            -------------------------------------------------- */}
+               ============================================== */}
 
             <div className="flex justify-between text-[10px] text-ink/50 mb-6 -mt-4">
-              {STEPS.map((step) => (
-                <span
-                  key={step}
-                  className="w-16 text-center"
-                >
-                  {step.replace(/_/g, " ")}
-                </span>
-              ))}
+              {STEPS.map(
+                (step) => (
+                  <span
+                    key={step}
+                    className="w-16 text-center"
+                  >
+                    {formatStatus(
+                      step
+                    )}
+                  </span>
+                )
+              )}
             </div>
           </>
         )}
 
-        {/* --------------------------------------------------
+        {/* ==================================================
             ITEMS
-        -------------------------------------------------- */}
+           ================================================== */}
 
         <div className="bg-white rounded-xl2 border border-ink/10 p-4 mb-4">
-          {order.items.map((item) => (
-            <div
-              key={item.id}
-              className="flex justify-between text-sm py-1.5 border-b border-ink/5 last:border-0"
-            >
-              <span>
-                {item.name} × {item.quantity}
-              </span>
 
-              <span>
-                ₹
-                {(
-                  Number(item.price) *
-                  item.quantity
-                ).toFixed(2)}
-              </span>
-            </div>
-          ))}
+          <h2 className="font-semibold text-sm mb-3">
+            Items
+          </h2>
 
-          <div className="flex justify-between text-sm pt-2 mt-1 border-t border-ink/10">
+          {order.items.map(
+            (item) => (
+              <div
+                key={item.id}
+                className="flex justify-between text-sm py-2 border-b border-ink/5 last:border-0"
+              >
+                <div>
+                  <div>
+                    {item.name} ×{" "}
+                    {item.quantity}
+                  </div>
+
+                  {item.unit && (
+                    <div className="text-xs text-ink/40">
+                      {item.unit}
+                    </div>
+                  )}
+                </div>
+
+                <span>
+                  {money(
+                    Number(
+                      item.price
+                    ) *
+                      Number(
+                        item.quantity
+                      )
+                  )}
+                </span>
+              </div>
+            )
+          )}
+
+          {/* SUBTOTAL */}
+
+          <div className="flex justify-between text-sm pt-3 mt-2 border-t border-ink/10">
             <span className="text-ink/60">
               Subtotal
             </span>
 
             <span>
-              ₹{Number(order.subtotal).toFixed(2)}
+              {money(
+                order.subtotal
+              )}
             </span>
           </div>
 
-          {Number(order.discount) > 0 && (
-            <div className="flex justify-between text-sm text-leaf">
-              <span>Discount</span>
+          {/* DISCOUNT */}
+
+          {Number(
+            order.discount
+          ) > 0 && (
+            <div className="flex justify-between text-sm text-leaf mt-2">
+              <span>
+                Coupon Discount
+              </span>
 
               <span>
-                −₹{Number(order.discount).toFixed(2)}
+                -{money(
+                  order.discount
+                )}
               </span>
             </div>
           )}
 
-          <div className="flex justify-between text-sm">
+          {/* STORE CASH */}
+
+          {Number(
+            order.storeCashUsed
+          ) > 0 && (
+            <div className="flex justify-between text-sm text-leaf mt-2">
+              <span>
+                Store Cash
+              </span>
+
+              <span>
+                -{money(
+                  order.storeCashUsed
+                )}
+              </span>
+            </div>
+          )}
+
+          {/* DELIVERY */}
+
+          <div className="flex justify-between text-sm mt-2">
             <span className="text-ink/60">
               Delivery fee
             </span>
 
             <span>
-              {Number(order.deliveryFee) === 0
+              {Number(
+                order.deliveryFee
+              ) === 0
                 ? "Free"
-                : `₹${Number(
+                : money(
                     order.deliveryFee
-                  ).toFixed(2)}`}
+                  )}
             </span>
           </div>
 
-          <div className="flex justify-between font-display font-800 pt-2 mt-1 border-t border-ink/10">
-            <span>Total</span>
+          {/* TOTAL */}
+
+          <div className="flex justify-between font-display font-800 text-base pt-3 mt-2 border-t border-ink/10">
+            <span>
+              Total
+            </span>
 
             <span>
-              ₹{Number(order.total).toFixed(2)}
+              {money(order.total)}
             </span>
           </div>
         </div>
 
-        {/* --------------------------------------------------
+        {/* ==================================================
             DELIVERY ADDRESS
-        -------------------------------------------------- */}
+           ================================================== */}
 
         <div className="bg-white rounded-xl2 border border-ink/10 p-4 mb-4 text-sm">
-          <div className="font-semibold mb-1">
+
+          <div className="font-semibold mb-2">
             Delivering to
           </div>
 
-          <div className="text-ink/70">
-            {order.address.line1},{" "}
-            {order.address.city},{" "}
-            {order.address.state} -{" "}
-            {order.address.pincode}
-          </div>
+          {order.address && (
+            <div className="text-ink/70">
+              <div>
+                {order.address.label}
+              </div>
+
+              <div>
+                {order.address.line1}
+              </div>
+
+              {order.address.line2 && (
+                <div>
+                  {order.address.line2}
+                </div>
+              )}
+
+              {order.address.landmark && (
+                <div>
+                  {order.address.landmark}
+                </div>
+              )}
+
+              <div>
+                {order.address.city},{" "}
+                {order.address.state} -{" "}
+                {order.address.pincode}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* --------------------------------------------------
+        {/* ==================================================
             PAYMENT
-        -------------------------------------------------- */}
+           ================================================== */}
 
-        <div className="text-sm mb-6">
-          <span className="text-ink/60">
-            Payment status:{" "}
-          </span>
+        <div className="bg-white rounded-xl2 border border-ink/10 p-4 mb-6 text-sm">
 
-          <span className="font-medium">
-            {order.paymentStatus}
-          </span>
+          <div className="font-semibold mb-2">
+            Payment
+          </div>
+
+          <div>
+            <span className="text-ink/60">
+              Payment status:{" "}
+            </span>
+
+            <span className="font-medium">
+              {formatStatus(
+                order.paymentStatus
+              )}
+            </span>
+          </div>
+
+          {order.razorpayPaymentId && (
+            <div className="mt-2">
+              <span className="text-ink/60">
+                Payment ID:{" "}
+              </span>
+
+              <span className="font-mono text-xs">
+                {order.razorpayPaymentId}
+              </span>
+            </div>
+          )}
+
+          {order.coupon && (
+            <div className="mt-2">
+              <span className="text-ink/60">
+                Coupon:{" "}
+              </span>
+
+              <span className="font-semibold text-leaf">
+                {order.coupon.code}
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* --------------------------------------------------
-            CANCEL ORDER
-        -------------------------------------------------- */}
+        {/* ==================================================
+            DOWNLOAD INVOICE
+           ================================================== */}
+
+        <Link
+          to={`/orders/${order.id}/invoice`}
+          className="w-full flex items-center justify-center bg-leaf text-cream rounded-xl py-3 font-semibold hover:opacity-90 transition"
+        >
+          Download Invoice
+        </Link>
+
+        {/* ==================================================
+            CANCEL
+           ================================================== */}
 
         {cancellable && (
           <button
-            onClick={cancelOrder}
-            disabled={cancelling}
-            className="w-full border border-red-300 text-red-600 rounded-xl py-3 font-semibold disabled:opacity-60"
+            type="button"
+            onClick={
+              cancelOrder
+            }
+            disabled={
+              cancelling
+            }
+            className="w-full border border-red-300 text-red-600 rounded-xl py-3 font-semibold disabled:opacity-60 mt-3"
           >
             {cancelling
               ? "Cancelling..."
@@ -336,25 +555,23 @@ export default function OrderDetail() {
         )}
 
         {/* ==================================================
-            FINAL NAVIGATION
-        ================================================== */}
+            NAVIGATION
+           ================================================== */}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
 
-          {/* HOME */}
           <Link
             to="/"
-            className="w-full text-center bg-leaf text-cream rounded-xl py-3 font-semibold hover:opacity-90 transition"
+            className="w-full text-center border border-leaf text-leaf rounded-xl py-3 font-semibold hover:bg-leaf hover:text-cream transition"
           >
-            🏠 Home
+            Home
           </Link>
 
-          {/* ORDERS */}
           <Link
             to="/orders"
             className="w-full text-center border border-leaf text-leaf rounded-xl py-3 font-semibold hover:bg-leaf hover:text-cream transition"
           >
-            📦 My Orders
+            My Orders
           </Link>
 
         </div>
