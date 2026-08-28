@@ -196,9 +196,43 @@ router.post("/orders/checkout", async (req, res) => {
     couponCode.trim()
   ) {
     const normalizedCoupon =
-      couponCode
-        .trim()
-        .toUpperCase();
+      couponCode.trim().toUpperCase();
+
+    // ========================================================
+    // FRESH50 - FIRST ORDER ONLY
+    // ========================================================
+    //
+    // A user can use FRESH50 only when they have never
+    // successfully paid for an order before.
+    //
+    // Failed, cancelled, or unpaid orders do NOT consume
+    // the first-order coupon.
+    //
+    // ========================================================
+
+    if (normalizedCoupon === "FRESH50") {
+      const previousPaidOrder =
+        await prisma.order.findFirst({
+          where: {
+            userId: req.user.id,
+            paymentStatus: "PAID",
+          },
+          select: {
+            id: true,
+          },
+        });
+
+      if (previousPaidOrder) {
+        return res.status(400).json({
+          error:
+            "FRESH50 is available only for your first order.",
+        });
+      }
+    }
+
+    // ========================================================
+    // FIND COUPON
+    // ========================================================
 
     coupon =
       await prisma.coupon.findUnique({

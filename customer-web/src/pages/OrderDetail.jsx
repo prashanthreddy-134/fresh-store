@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import NavBar from "../components/NavBar";
 
@@ -27,7 +27,10 @@ export default function OrderDetail() {
     }
   }, [id]);
 
-  // Initial order load.
+  // ------------------------------------------------------------
+  // INITIAL ORDER LOAD
+  // ------------------------------------------------------------
+
   useEffect(() => {
     load();
   }, [load]);
@@ -143,7 +146,10 @@ export default function OrderDetail() {
 
       <div className="max-w-2xl mx-auto px-4 py-6">
 
-        {/* Order heading */}
+        {/* --------------------------------------------------
+            ORDER HEADING
+        -------------------------------------------------- */}
+
         <div className="flex justify-between items-start mb-1">
           <h1 className="font-display font-800 text-xl">
             {order.orderNumber}
@@ -154,7 +160,10 @@ export default function OrderDetail() {
           {new Date(order.placedAt).toLocaleString()}
         </p>
 
-        {/* Cancelled */}
+        {/* --------------------------------------------------
+            CANCELLED
+        -------------------------------------------------- */}
+
         {order.status === "CANCELLED" ? (
           <div className="bg-red-50 text-red-600 rounded-xl2 p-4 mb-6 text-sm">
             Order cancelled
@@ -164,7 +173,10 @@ export default function OrderDetail() {
           </div>
         ) : (
           <>
-            {/* Order progress */}
+            {/* --------------------------------------------------
+                ORDER PROGRESS
+            -------------------------------------------------- */}
+
             <div className="flex items-center mb-6">
               {STEPS.map((step, i) => (
                 <div
@@ -192,7 +204,10 @@ export default function OrderDetail() {
               ))}
             </div>
 
-            {/* Status labels */}
+            {/* --------------------------------------------------
+                STATUS LABELS
+            -------------------------------------------------- */}
+
             <div className="flex justify-between text-[10px] text-ink/50 mb-6 -mt-4">
               {STEPS.map((step) => (
                 <span
@@ -206,7 +221,10 @@ export default function OrderDetail() {
           </>
         )}
 
-        {/* Items */}
+        {/* --------------------------------------------------
+            ITEMS
+        -------------------------------------------------- */}
+
         <div className="bg-white rounded-xl2 border border-ink/10 p-4 mb-4">
           {order.items.map((item) => (
             <div
@@ -270,7 +288,10 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        {/* Delivery address */}
+        {/* --------------------------------------------------
+            DELIVERY ADDRESS
+        -------------------------------------------------- */}
+
         <div className="bg-white rounded-xl2 border border-ink/10 p-4 mb-4 text-sm">
           <div className="font-semibold mb-1">
             Delivering to
@@ -284,7 +305,10 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        {/* Payment */}
+        {/* --------------------------------------------------
+            PAYMENT
+        -------------------------------------------------- */}
+
         <div className="text-sm mb-6">
           <span className="text-ink/60">
             Payment status:{" "}
@@ -295,7 +319,10 @@ export default function OrderDetail() {
           </span>
         </div>
 
-        {/* Cancel */}
+        {/* --------------------------------------------------
+            CANCEL ORDER
+        -------------------------------------------------- */}
+
         {cancellable && (
           <button
             onClick={cancelOrder}
@@ -307,6 +334,31 @@ export default function OrderDetail() {
               : "Cancel order"}
           </button>
         )}
+
+        {/* ==================================================
+            FINAL NAVIGATION
+        ================================================== */}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+
+          {/* HOME */}
+          <Link
+            to="/"
+            className="w-full text-center bg-leaf text-cream rounded-xl py-3 font-semibold hover:opacity-90 transition"
+          >
+            🏠 Home
+          </Link>
+
+          {/* ORDERS */}
+          <Link
+            to="/orders"
+            className="w-full text-center border border-leaf text-leaf rounded-xl py-3 font-semibold hover:bg-leaf hover:text-cream transition"
+          >
+            📦 My Orders
+          </Link>
+
+        </div>
+
       </div>
     </div>
   );
