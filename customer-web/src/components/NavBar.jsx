@@ -50,12 +50,32 @@ export default function NavBar({ search, onSearch }) {
         {/* Right side */}
         <nav className="ml-auto flex items-center gap-3 text-sm font-medium shrink-0">
 
+          {/* Cart */}
+          <Link
+            to="/cart"
+            className="relative flex items-center gap-2 px-3 py-2 rounded-full border border-ink/10 bg-white hover:border-leaf hover:text-leaf transition"
+          >
+            <span className="text-lg leading-none">
+              🛒
+            </span>
+
+            <span className="hidden sm:inline">
+              Cart
+            </span>
+
+            {count > 0 && (
+              <span className="min-w-5 h-5 px-1 rounded-full bg-leaf text-cream grid place-items-center text-[10px] font-bold">
+                {count}
+              </span>
+            )}
+          </Link>
+
+          {/* Profile */}
           {user ? (
             <Link
               to="/profile"
               className="flex items-center gap-2 px-3 py-2 rounded-full border border-ink/10 bg-white hover:border-leaf hover:text-leaf transition"
             >
-              {/* Profile icon */}
               <span className="w-7 h-7 rounded-full bg-leaf text-cream grid place-items-center text-xs font-bold">
                 {(user.name || "U").charAt(0).toUpperCase()}
               </span>
