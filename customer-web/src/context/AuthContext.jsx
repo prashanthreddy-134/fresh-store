@@ -4,8 +4,14 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    const raw = localStorage.getItem("fs_user");
-    return raw ? JSON.parse(raw) : null;
+    try {
+      const raw = localStorage.getItem("fs_user");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      localStorage.removeItem("fs_user");
+      localStorage.removeItem("fs_token");
+      return null;
+    }
   });
 
   function login(token, userData) {
@@ -20,7 +26,11 @@ export function AuthProvider({ children }) {
     setUser(null);
   }
 
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

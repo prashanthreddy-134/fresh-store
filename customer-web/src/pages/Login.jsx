@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -15,11 +15,33 @@ export default function Login() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const phoneRegex = /^\+?[1-9]\d{9,14}$/;
+
+  // ========================================
+  // OTP RESEND COUNTDOWN
+  // ========================================
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+
+    const timer = setInterval(() => {
+      setResendCooldown((previous) => {
+        if (previous <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+
+        return previous - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   // ========================================
   // LOGIN - REQUEST OTP
@@ -48,6 +70,10 @@ export default function Login() {
       setPhone(cleanPhone);
       setOtp("");
       setStep("otp");
+
+      // Start 30-second resend countdown
+      setResendCooldown(30);
+
       setMessage("OTP sent successfully.");
     } catch (err) {
       setError(
@@ -133,6 +159,10 @@ export default function Login() {
       setPhone(cleanPhone);
       setOtp("");
       setStep("otp");
+
+      // Start 30-second resend countdown
+      setResendCooldown(30);
+
       setMessage("OTP sent successfully.");
     } catch (err) {
       setError(
@@ -172,15 +202,17 @@ export default function Login() {
         code: cleanOtp,
       });
 
-      // IMPORTANT:
       // Registration does NOT log the customer in.
-      // Return to the Login page.
+      // Return to Login.
       setMode("login");
       setStep("phone");
 
       setName("");
       setPhone(cleanPhone);
       setOtp("");
+
+      // Stop any active countdown
+      setResendCooldown(0);
 
       setError("");
 
@@ -202,6 +234,15 @@ export default function Login() {
   // ========================================
 
   async function handleResendOtp() {
+    // Extra protection against repeated clicks
+    if (
+      resendCooldown > 0 ||
+      resendLoading ||
+      loading
+    ) {
+      return;
+    }
+
     setError("");
     setMessage("");
 
@@ -227,6 +268,10 @@ export default function Login() {
       }
 
       setOtp("");
+
+      // Restart 30-second countdown
+      setResendCooldown(30);
+
       setMessage("A new OTP has been sent.");
     } catch (err) {
       setError(
@@ -245,6 +290,7 @@ export default function Login() {
   function backToPhone() {
     setStep("phone");
     setOtp("");
+    setResendCooldown(0);
     setError("");
     setMessage("");
   }
@@ -257,6 +303,7 @@ export default function Login() {
     setMode(newMode);
     setStep("phone");
     setOtp("");
+    setResendCooldown(0);
     setError("");
     setMessage("");
   }
@@ -279,8 +326,8 @@ export default function Login() {
               ? "Verify your mobile number"
               : "Log in to Fresh Store"
             : step === "otp"
-              ? "Verify your mobile number"
-              : "Create your Fresh Store account"}
+            ? "Verify your mobile number"
+            : "Create your Fresh Store account"}
         </h1>
 
         <p className="text-sm text-ink/60 mb-5">
@@ -289,8 +336,8 @@ export default function Login() {
               ? `Enter the 6-digit OTP sent to ${phone}`
               : "Login securely using your registered mobile number."
             : step === "otp"
-              ? `Enter the 6-digit OTP sent to ${phone}`
-              : "Create your customer account to start shopping."}
+            ? `Enter the 6-digit OTP sent to ${phone}`
+            : "Create your customer account to start shopping."}
         </p>
 
         {/* ================================= */}
@@ -400,12 +447,16 @@ export default function Login() {
                 type="button"
                 onClick={handleResendOtp}
                 disabled={
-                  loading || resendLoading
+                  loading ||
+                  resendLoading ||
+                  resendCooldown > 0
                 }
                 className="text-sm text-leaf font-semibold disabled:opacity-50"
               >
                 {resendLoading
                   ? "Sending..."
+                  : resendCooldown > 0
+                  ? `Resend OTP in ${resendCooldown}s`
                   : "Resend OTP"}
               </button>
             </div>
@@ -531,12 +582,16 @@ export default function Login() {
                 type="button"
                 onClick={handleResendOtp}
                 disabled={
-                  loading || resendLoading
+                  loading ||
+                  resendLoading ||
+                  resendCooldown > 0
                 }
                 className="text-sm text-leaf font-semibold disabled:opacity-50"
               >
                 {resendLoading
                   ? "Sending..."
+                  : resendCooldown > 0
+                  ? `Resend OTP in ${resendCooldown}s`
                   : "Resend OTP"}
               </button>
             </div>
