@@ -12,6 +12,7 @@ export default function ProfileReviews() {
 
         {/* Back to Profile */}
         <button
+          type="button"
           onClick={() => navigate("/profile")}
           className="flex items-center gap-2 text-sm font-medium text-leaf hover:opacity-70 transition mb-6"
         >
@@ -26,7 +27,7 @@ export default function ProfileReviews() {
           </h1>
 
           <p className="text-sm text-ink/45 mt-1">
-            Share your experience and earn rewards
+            Review your Fresh Store purchases and earn rewards.
           </p>
         </div>
 
@@ -42,12 +43,13 @@ export default function ProfileReviews() {
           </h2>
 
           <p className="text-sm text-ink/45 mt-2 max-w-sm mx-auto">
-            After purchasing products, you can review them here and earn available rewards.
+            Your eligible purchases will appear here when they are available
+            for review.
           </p>
 
         </div>
 
-        {/* How it works */}
+        {/* Information */}
         <div className="bg-white rounded-[24px] border border-ink/10 p-5 mt-5">
 
           <h2 className="font-display font-800 text-lg mb-4">
@@ -56,50 +58,56 @@ export default function ProfileReviews() {
 
           <div className="space-y-4">
 
-            <div className="flex gap-3">
-              <div className="w-9 h-9 rounded-xl bg-leaf-light grid place-items-center shrink-0">
-                🛒
-              </div>
-
-              <div>
-                <p className="font-semibold text-sm">
-                  Buy a product
-                </p>
-
-                <p className="text-xs text-ink/45 mt-1 leading-5">
-                  Purchase products from Fresh Store and complete your order.
-                </p>
-              </div>
-            </div>
-
+            {/* Review products */}
             <div className="flex gap-3">
               <div className="w-9 h-9 rounded-xl bg-leaf-light grid place-items-center shrink-0">
                 ⭐
               </div>
 
               <div>
-                <p className="font-semibold text-sm">
-                  Write a review
+                <p className="font-semibold text-sm text-ink">
+                  Review your products
                 </p>
 
                 <p className="text-xs text-ink/45 mt-1 leading-5">
-                  Share an honest rating and review about your purchased product.
+                  Share your experience with products you have purchased from
+                  Fresh Store.
                 </p>
               </div>
             </div>
 
+            {/* Earn rewards */}
             <div className="flex gap-3">
               <div className="w-9 h-9 rounded-xl bg-leaf-light grid place-items-center shrink-0">
-                🎁
+                🏆
               </div>
 
               <div>
-                <p className="font-semibold text-sm">
+                <p className="font-semibold text-sm text-ink">
                   Earn rewards
                 </p>
 
                 <p className="text-xs text-ink/45 mt-1 leading-5">
-                  Eligible reviews may earn rewards according to Fresh Store's reward rules.
+                  Eligible reviews may earn rewards according to Fresh
+                  Store's reward rules.
+                </p>
+              </div>
+            </div>
+
+            {/* Eligible purchases */}
+            <div className="flex gap-3">
+              <div className="w-9 h-9 rounded-xl bg-leaf-light grid place-items-center shrink-0">
+                📦
+              </div>
+
+              <div>
+                <p className="font-semibold text-sm text-ink">
+                  Eligible purchases
+                </p>
+
+                <p className="text-xs text-ink/45 mt-1 leading-5">
+                  Only eligible products and completed purchases can be
+                  available for review.
                 </p>
               </div>
             </div>
