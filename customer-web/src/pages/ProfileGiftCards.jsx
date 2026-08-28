@@ -12,6 +12,7 @@ export default function ProfileGiftCards() {
 
         {/* Back to Profile */}
         <button
+          type="button"
           onClick={() => navigate("/profile")}
           className="flex items-center gap-2 text-sm font-medium text-leaf hover:opacity-70 transition mb-6"
         >
@@ -30,7 +31,7 @@ export default function ProfileGiftCards() {
           </p>
         </div>
 
-        {/* Gift card empty state */}
+        {/* Empty State */}
         <div className="bg-white rounded-[24px] border border-ink/10 p-6 text-center">
 
           <div className="w-16 h-16 mx-auto rounded-2xl bg-leaf-light grid place-items-center text-3xl mb-4">
@@ -42,12 +43,13 @@ export default function ProfileGiftCards() {
           </h2>
 
           <p className="text-sm text-ink/45 mt-2 max-w-sm mx-auto">
-            Your purchased or received Fresh Store gift cards will appear here.
+            Your purchased or received Fresh Store gift cards will appear
+            here.
           </p>
 
         </div>
 
-        {/* Gift card information */}
+        {/* Information */}
         <div className="bg-white rounded-[24px] border border-ink/10 p-5 mt-5">
 
           <h2 className="font-display font-800 text-lg mb-4">
@@ -56,50 +58,56 @@ export default function ProfileGiftCards() {
 
           <div className="space-y-4">
 
+            {/* Give a gift */}
             <div className="flex gap-3">
               <div className="w-9 h-9 rounded-xl bg-leaf-light grid place-items-center shrink-0">
                 🎁
               </div>
 
               <div>
-                <p className="font-semibold text-sm">
+                <p className="font-semibold text-sm text-ink">
                   Give a gift
                 </p>
 
                 <p className="text-xs text-ink/45 mt-1 leading-5">
-                  Gift cards can be used to give someone credit for shopping on Fresh Store.
+                  Gift cards can be used to give someone credit for shopping
+                  on Fresh Store.
                 </p>
               </div>
             </div>
 
+            {/* Checkout */}
             <div className="flex gap-3">
               <div className="w-9 h-9 rounded-xl bg-leaf-light grid place-items-center shrink-0">
                 🛒
               </div>
 
               <div>
-                <p className="font-semibold text-sm">
+                <p className="font-semibold text-sm text-ink">
                   Use at checkout
                 </p>
 
                 <p className="text-xs text-ink/45 mt-1 leading-5">
-                  Eligible gift card balances can be applied toward your purchases.
+                  Eligible gift card balances can be applied toward your
+                  purchases.
                 </p>
               </div>
             </div>
 
+            {/* Security */}
             <div className="flex gap-3">
               <div className="w-9 h-9 rounded-xl bg-leaf-light grid place-items-center shrink-0">
                 🔒
               </div>
 
               <div>
-                <p className="font-semibold text-sm">
+                <p className="font-semibold text-sm text-ink">
                   Secure balance
                 </p>
 
                 <p className="text-xs text-ink/45 mt-1 leading-5">
-                  Your gift card balance and transactions will be associated with your account.
+                  Your gift card balance and transactions will be associated
+                  with your account.
                 </p>
               </div>
             </div>
