@@ -128,12 +128,12 @@ function Cart() {
 
         <div className="flex items-center justify-between mb-5">
           <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="text-sm font-medium text-leaf hover:opacity-70 transition"
-          >
-            ← Back
-          </button>
+  type="button"
+  onClick={() => navigate("/")}
+  className="text-sm font-medium text-leaf hover:opacity-70 transition"
+>
+  ← Back
+</button>
 
           <Link
             to="/"
