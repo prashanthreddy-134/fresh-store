@@ -5,12 +5,28 @@ import { useCart } from "../context/CartContext";
 import { api } from "../api/client";
 
 function Cart() {
-  const { items, subtotal, updateQuantity } = useCart();
+  const {
+    items,
+    subtotal,
+    updateQuantity,
+    cartError,
+    clearCartError,
+  } = useCart();
+
   const navigate = useNavigate();
 
-  const [storeCashBalance, setStoreCashBalance] = useState(0);
-  const [useStoreCash, setUseStoreCash] = useState(false);
-  const [loadingStoreCash, setLoadingStoreCash] = useState(true);
+  const [storeCashBalance, setStoreCashBalance] =
+    useState(0);
+
+  const [useStoreCash, setUseStoreCash] =
+    useState(false);
+
+  const [loadingStoreCash, setLoadingStoreCash] =
+    useState(true);
+
+  // ============================================================
+  // LOAD STORE CASH
+  // ============================================================
 
   useEffect(() => {
     let mounted = true;
@@ -21,9 +37,14 @@ function Cart() {
 
         if (!mounted) return;
 
-        setStoreCashBalance(Number(res.data?.balance || 0));
+        setStoreCashBalance(
+          Number(res.data?.balance || 0)
+        );
       } catch (err) {
-        console.error("Failed to load Store Cash:", err);
+        console.error(
+          "Failed to load Store Cash:",
+          err
+        );
 
         if (mounted) {
           setStoreCashBalance(0);
@@ -42,8 +63,15 @@ function Cart() {
     };
   }, []);
 
+  // ============================================================
+  // STORE CASH CALCULATION
+  // ============================================================
+
   const storeCashToUse = useStoreCash
-    ? Math.min(Number(storeCashBalance), Number(subtotal))
+    ? Math.min(
+        Number(storeCashBalance),
+        Number(subtotal)
+      )
     : 0;
 
   const remainingAfterStoreCash = Math.max(
@@ -51,18 +79,42 @@ function Cart() {
     Number(subtotal) - storeCashToUse
   );
 
- function goToCheckout() {
-  sessionStorage.setItem(
-    "freshStoreCashToUse",
-    String(storeCashToUse)
-  );
+  // ============================================================
+  // CHECKOUT
+  // ============================================================
 
-  navigate("/checkout", {
-    state: {
-      storeCashToUse,
-    },
-  });
-}
+  function goToCheckout() {
+    sessionStorage.setItem(
+      "freshStoreCashToUse",
+      String(storeCashToUse)
+    );
+
+    navigate("/checkout", {
+      state: {
+        storeCashToUse,
+      },
+    });
+  }
+
+  // ============================================================
+  // CART QUANTITY ERROR HANDLER
+  // ============================================================
+
+  function handleQuantityChange(
+    productId,
+    quantity
+  ) {
+    updateQuantity(productId, quantity).catch(
+      () => {
+        // CartContext already stores the customer-visible
+        // error and refreshes the cart.
+      }
+    );
+  }
+
+  // ============================================================
+  // RENDER
+  // ============================================================
 
   return (
     <div className="min-h-screen bg-cream">
@@ -70,9 +122,13 @@ function Cart() {
 
       <div className="max-w-2xl mx-auto px-4 py-6">
 
-        {/* Navigation */}
+        {/* ====================================================== */}
+        {/* NAVIGATION */}
+        {/* ====================================================== */}
+
         <div className="flex items-center justify-between mb-5">
           <button
+            type="button"
             onClick={() => navigate(-1)}
             className="text-sm font-medium text-leaf hover:opacity-70 transition"
           >
@@ -87,9 +143,46 @@ function Cart() {
           </Link>
         </div>
 
+        {/* ====================================================== */}
+        {/* TITLE */}
+        {/* ====================================================== */}
+
         <h1 className="font-display font-800 text-xl mb-4">
           Your cart
         </h1>
+
+        {/* ====================================================== */}
+        {/* CART ERROR */}
+        {/* ====================================================== */}
+
+        {cartError && (
+          <div className="mb-4 rounded-xl2 border border-red-200 bg-red-50 px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-red-700">
+                  Cart update failed
+                </p>
+
+                <p className="text-sm text-red-600 mt-0.5">
+                  {cartError}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={clearCartError}
+                className="text-red-500 text-lg leading-none"
+                aria-label="Dismiss cart error"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ====================================================== */}
+        {/* EMPTY CART */}
+        {/* ====================================================== */}
 
         {items.length === 0 ? (
           <div className="text-center py-16">
@@ -106,78 +199,121 @@ function Cart() {
           </div>
         ) : (
           <>
-            {/* Cart Items */}
+            {/* ================================================== */}
+            {/* CART ITEMS */}
+            {/* ================================================== */}
+
             <div className="space-y-3 mb-6">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-white rounded-xl2 border border-ink/10 p-3 flex items-center gap-3"
-                >
-                  <div className="w-14 h-14 rounded-xl bg-leaf-light grid place-items-center shrink-0">
-                    {item.product.imageUrl ? (
-                      <img
-                        src={item.product.imageUrl}
-                        alt={item.product.name}
-                        className="w-full h-full object-cover rounded-xl"
-                      />
-                    ) : (
-                      <span className="text-xl">
-                        🥬
-                      </span>
-                    )}
-                  </div>
+              {items.map((item) => {
+                const stock = Number(
+                  item.product?.stockQty ?? 0
+                );
 
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">
-                      {item.product.name}
+                const isOutOfStock = stock <= 0;
+
+                return (
+                  <div
+                    key={item.id}
+                    className="bg-white rounded-xl2 border border-ink/10 p-3"
+                  >
+                    <div className="flex items-center gap-3">
+
+                      {/* Product Image */}
+                      <div className="w-14 h-14 rounded-xl bg-leaf-light grid place-items-center shrink-0 overflow-hidden">
+                        {item.product?.imageUrl ? (
+                          <img
+                            src={item.product.imageUrl}
+                            alt={item.product.name}
+                            className="w-full h-full object-cover rounded-xl"
+                          />
+                        ) : (
+                          <span className="text-xl">
+                            🥬
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Product Information */}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">
+                          {item.product?.name}
+                        </div>
+
+                        <div className="text-xs text-ink/50">
+                          {item.product?.unit}
+                        </div>
+
+                        <div className="font-display font-800 text-sm mt-0.5">
+                          ₹
+                          {Number(
+                            item.product?.sellingPrice || 0
+                          ).toFixed(2)}
+                        </div>
+
+                        {isOutOfStock ? (
+                          <div className="text-[11px] text-red-600 font-semibold mt-1">
+                            Currently out of stock
+                          </div>
+                        ) : item.quantity >= stock ? (
+                          <div className="text-[11px] text-orange-600 font-semibold mt-1">
+                            Maximum available quantity
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {/* Quantity Controls */}
+                      <div className="flex items-center gap-2 bg-leaf text-cream rounded-full px-2 py-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleQuantityChange(
+                              item.productId,
+                              item.quantity - 1
+                            )
+                          }
+                          className="w-6 h-6"
+                          aria-label={`Decrease ${item.product?.name}`}
+                        >
+                          −
+                        </button>
+
+                        <span className="font-mono w-4 text-center text-sm">
+                          {item.quantity}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleQuantityChange(
+                              item.productId,
+                              item.quantity + 1
+                            )
+                          }
+                          disabled={
+                            isOutOfStock ||
+                            item.quantity >= stock
+                          }
+                          className={`w-6 h-6 ${
+                            isOutOfStock ||
+                            item.quantity >= stock
+                              ? "opacity-40 cursor-not-allowed"
+                              : ""
+                          }`}
+                          aria-label={`Increase ${item.product?.name}`}
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
-
-                    <div className="text-xs text-ink/50">
-                      {item.product.unit}
-                    </div>
-
-                    <div className="font-display font-800 text-sm mt-0.5">
-                      ₹
-                      {Number(
-                        item.product.sellingPrice
-                      ).toFixed(2)}
-                    </div>
                   </div>
-
-                  <div className="flex items-center gap-2 bg-leaf text-cream rounded-full px-2 py-1">
-                    <button
-                      onClick={() =>
-                        updateQuantity(
-                          item.productId,
-                          item.quantity - 1
-                        )
-                      }
-                      className="w-6 h-6"
-                    >
-                      −
-                    </button>
-
-                    <span className="font-mono w-4 text-center text-sm">
-                      {item.quantity}
-                    </span>
-
-                    <button
-                      onClick={() =>
-                        updateQuantity(
-                          item.productId,
-                          item.quantity + 1
-                        )
-                      }
-                      className="w-6 h-6"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
-            {/* Store Cash */}
+            {/* ================================================== */}
+            {/* STORE CASH */}
+            {/* ================================================== */}
+
             <div className="bg-white rounded-xl2 border border-ink/10 p-4 mb-4">
               <div className="flex items-center justify-between gap-4">
 
@@ -211,7 +347,9 @@ function Cart() {
                     storeCashBalance <= 0
                   }
                   onClick={() =>
-                    setUseStoreCash(!useStoreCash)
+                    setUseStoreCash(
+                      !useStoreCash
+                    )
                   }
                   className={
                     "relative w-12 h-7 rounded-full transition " +
@@ -234,7 +372,6 @@ function Cart() {
                     }
                   />
                 </button>
-
               </div>
 
               {useStoreCash &&
@@ -259,7 +396,9 @@ function Cart() {
 
                       <span className="font-semibold">
                         ₹
-                        {remainingAfterStoreCash.toFixed(2)}
+                        {remainingAfterStoreCash.toFixed(
+                          2
+                        )}
                       </span>
                     </div>
 
@@ -267,7 +406,10 @@ function Cart() {
                 )}
             </div>
 
-            {/* Summary */}
+            {/* ================================================== */}
+            {/* SUMMARY */}
+            {/* ================================================== */}
+
             <div className="bg-white rounded-xl2 border border-ink/10 p-4 mb-4">
 
               <div className="flex justify-between text-sm mb-1">
@@ -301,23 +443,28 @@ function Cart() {
 
                 <span>
                   ₹
-                  {remainingAfterStoreCash.toFixed(2)}
+                  {remainingAfterStoreCash.toFixed(
+                    2
+                  )}
                 </span>
               </div>
 
               <p className="text-xs text-ink/40 mt-2">
-                Delivery fee and discounts are calculated
-                at checkout.
+                Delivery fee and discounts are
+                calculated at checkout.
               </p>
-
             </div>
 
-            {/* Checkout */}
+            {/* ================================================== */}
+            {/* CHECKOUT */}
+            {/* ================================================== */}
+
             <button
+              type="button"
               onClick={goToCheckout}
               className="w-full bg-leaf text-cream rounded-xl py-3 font-semibold"
             >
-             Continue to Checkout →
+              Continue to Checkout →
             </button>
 
             <Link
@@ -326,10 +473,8 @@ function Cart() {
             >
               Continue shopping
             </Link>
-
           </>
         )}
-
       </div>
     </div>
   );

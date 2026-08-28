@@ -20,16 +20,24 @@ export function CartProvider({ children }) {
   const [items, setItems] = useState([]);
   const [subtotal, setSubtotal] = useState(0);
 
+  // Customer-visible cart error.
+  const [cartError, setCartError] = useState("");
+
+  // Prevent multiple simultaneous refresh requests.
   const refreshingRef = useRef(false);
+
+  // ============================================================
+  // REFRESH CART
+  // ============================================================
 
   const refresh = useCallback(async () => {
     if (!user) {
       setItems([]);
       setSubtotal(0);
+      setCartError("");
       return;
     }
 
-    // Prevent multiple simultaneous refresh requests.
     if (refreshingRef.current) return;
 
     refreshingRef.current = true;
@@ -37,28 +45,38 @@ export function CartProvider({ children }) {
     try {
       const res = await api.get("/cart");
 
-      setItems(res.data.items || []);
-      setSubtotal(Number(res.data.subtotal || 0));
+      setItems(res.data?.items || []);
+      setSubtotal(Number(res.data?.subtotal || 0));
+
+      // Clear previous error after successful refresh.
+      setCartError("");
     } catch (err) {
       console.error("Cart refresh failed:", err);
+
+      setCartError(
+        err.response?.data?.error ||
+          "Could not refresh your cart."
+      );
     } finally {
       refreshingRef.current = false;
     }
   }, [user]);
 
-  // Initial cart load whenever authentication changes.
+  // ============================================================
+  // INITIAL CART LOAD
+  // ============================================================
+
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  // ------------------------------------------------------------
+  // ============================================================
   // AUTOMATIC CART REFRESH
-  // ------------------------------------------------------------
+  // ============================================================
 
   useEffect(() => {
     if (!user) return;
 
-    // Refresh every 10 seconds.
     const interval = setInterval(() => {
       refresh();
     }, CART_REFRESH_INTERVAL);
@@ -68,9 +86,9 @@ export function CartProvider({ children }) {
     };
   }, [user, refresh]);
 
-  // ------------------------------------------------------------
+  // ============================================================
   // REFRESH WHEN CUSTOMER RETURNS TO WEBSITE
-  // ------------------------------------------------------------
+  // ============================================================
 
   useEffect(() => {
     if (!user) return;
@@ -94,9 +112,9 @@ export function CartProvider({ children }) {
     };
   }, [user, refresh]);
 
-  // ------------------------------------------------------------
+  // ============================================================
   // REFRESH WHEN INTERNET CONNECTION RETURNS
-  // ------------------------------------------------------------
+  // ============================================================
 
   useEffect(() => {
     if (!user) return;
@@ -105,10 +123,7 @@ export function CartProvider({ children }) {
       refresh();
     }
 
-    window.addEventListener(
-      "online",
-      handleOnline
-    );
+    window.addEventListener("online", handleOnline);
 
     return () => {
       window.removeEventListener(
@@ -118,14 +133,13 @@ export function CartProvider({ children }) {
     };
   }, [user, refresh]);
 
-  // ------------------------------------------------------------
+  // ============================================================
   // ADD TO CART
-  // ------------------------------------------------------------
+  // ============================================================
 
-  async function addToCart(
-    productId,
-    quantity = 1
-  ) {
+  async function addToCart(productId, quantity = 1) {
+    setCartError("");
+
     try {
       await api.post("/cart", {
         productId,
@@ -134,28 +148,44 @@ export function CartProvider({ children }) {
 
       await refresh();
     } catch (err) {
-      console.error(
-        "Add to cart failed:",
-        err
-      );
+      console.error("Add to cart failed:", err);
+
+      const message =
+        err.response?.data?.error ||
+        "Could not add this product to your cart.";
+
+      setCartError(message);
 
       throw err;
     }
   }
 
-  // ------------------------------------------------------------
+  // ============================================================
   // UPDATE QUANTITY
-  // ------------------------------------------------------------
+  // ============================================================
 
-  async function updateQuantity(
-    productId,
-    quantity
-  ) {
+  async function updateQuantity(productId, quantity) {
+    setCartError("");
+
+    // Frontend safety validation.
+    const safeQuantity = Number(quantity);
+
+    if (
+      !Number.isInteger(safeQuantity) ||
+      safeQuantity < 0
+    ) {
+      const message =
+        "Invalid cart quantity.";
+
+      setCartError(message);
+
+      throw new Error(message);
+    }
+
     try {
-      await api.put(
-        `/cart/${productId}`,
-        { quantity }
-      );
+      await api.put(`/cart/${productId}`, {
+        quantity: safeQuantity,
+      });
 
       await refresh();
     } catch (err) {
@@ -164,13 +194,23 @@ export function CartProvider({ children }) {
         err
       );
 
+      const message =
+        err.response?.data?.error ||
+        "Could not update your cart.";
+
+      setCartError(message);
+
+      // Refresh again because stock may have changed
+      // while the customer was viewing the cart.
+      await refresh();
+
       throw err;
     }
   }
 
-  // ------------------------------------------------------------
+  // ============================================================
   // CART COUNT
-  // ------------------------------------------------------------
+  // ============================================================
 
   const count = items.reduce(
     (sum, item) =>
@@ -178,15 +218,21 @@ export function CartProvider({ children }) {
     0
   );
 
+  // ============================================================
+  // PROVIDER
+  // ============================================================
+
   return (
     <CartContext.Provider
       value={{
         items,
         subtotal,
         count,
+        cartError,
         addToCart,
         updateQuantity,
         refresh,
+        clearCartError: () => setCartError(""),
       }}
     >
       {children}
